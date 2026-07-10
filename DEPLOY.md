@@ -31,6 +31,10 @@ is designed to be visible in browser code.
 
 ## ⚠️ Before sharing the URL publicly — tighten RLS
 
+**If you've set up GitHub sign-in (see `AUTH.md`), use the authenticated-only
+policy there — it supersedes the options below.** The options below are only for
+an unauthenticated public demo.
+
 The demo RLS policies grant the anonymous role **full read + write** on every
 table. Locally that's fine; on a public URL it means anyone can read or modify
 the fleet data with the publishable key.

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import { hasApiKey, setApiKey } from "./lib/ai";
+import Login from "./views/Login";
 import type {
   AdCompliance,
   Aircraft,
@@ -59,6 +61,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [keySet, setKeySet] = useState(hasApiKey());
+  const [session, setSession] = useState<Session | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   async function reload() {
     setLoading(true);
@@ -96,9 +100,21 @@ export default function App() {
     }
   }
 
+  // Track the auth session (Supabase handles the OAuth code exchange on load).
   useEffect(() => {
-    void reload();
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
   }, []);
+
+  // Load fleet data only once signed in (RLS restricts reads to authenticated users).
+  useEffect(() => {
+    if (session) void reload();
+    else setLoading(false);
+  }, [session]);
 
   // Badge counts for the sidebar
   const aogCount = store.aircraft.filter((a) => a.status === "aog").length;
@@ -134,6 +150,19 @@ export default function App() {
     }
   }
 
+  if (!authReady) {
+    return (
+      <div className="app">
+        <main className="main">
+          <p className="spinner">Checking sign-in…</p>
+        </main>
+      </div>
+    );
+  }
+  if (!session) return <Login />;
+
+  const account = session.user.user_metadata?.user_name ?? session.user.email ?? "signed in";
+
   return (
     <div className="app">
       <aside className="sidebar">
@@ -157,6 +186,16 @@ export default function App() {
         <div style={{ marginTop: 20, padding: "0 8px" }}>
           <button className="btn ghost" style={{ width: "100%" }} onClick={handleKey}>
             {keySet ? "✓ AI key set" : "Set Claude API key"}
+          </button>
+          <div className="muted" style={{ fontSize: 11, margin: "14px 0 6px", textAlign: "center" }}>
+            {account}
+          </div>
+          <button
+            className="btn ghost"
+            style={{ width: "100%" }}
+            onClick={() => supabase.auth.signOut()}
+          >
+            Sign out
           </button>
         </div>
       </aside>
