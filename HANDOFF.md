@@ -84,11 +84,13 @@ policy `auth_all` scoped to role `authenticated`, and no `demo_all` / `anon`
 policy remaining. (If the MCP is read-only, append `&read_only=false` to the URL
 in `.mcp.json` and re-authenticate.)
 
-### 3. Deploy to Cloudflare Pages
-- `bunx wrangler login` (once, interactive)
-- `bun run deploy` → creates the `aero-mro` Pages project, prints the
-  `https://aero-mro.pages.dev` URL.
-- Add that URL to the GitHub OAuth App homepage + Supabase redirect URLs.
+### 3. ✅ DONE 2026-07-10 — Deployed to Cloudflare Pages
+Live at **https://aero-mro.pages.dev** (account david.oliver@ba.com). Verified:
+200 + SPA fallback working. Note: newer Wrangler delegates Pages deploys to
+Workers and demands Vite ≥6, so the deploy script now carries `--force` to
+target classic Pages directly.
+- Remaining: add `https://aero-mro.pages.dev` to the GitHub OAuth App homepage
+  + Supabase redirect URLs (part of step 1).
 
 ## Open decisions / possible next work
 

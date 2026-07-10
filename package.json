@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "deploy": "bun run build && wrangler pages deploy dist --project-name aero-mro"
+    "deploy": "bun run build && wrangler pages deploy dist --project-name aero-mro --force"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
