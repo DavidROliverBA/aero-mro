@@ -50,47 +50,27 @@ DEPLOY.md    Cloudflare Pages deploy (Wrangler direct upload)
 - ✅ Supabase MCP added to this repo (`.mcp.json`), Cloudflare Skills plugin
   installed, both authenticated.
 
-## What's OUTSTANDING — do in this order
+## Previously outstanding — ALL DONE 2026-07-10
 
-### 1. Finish GitHub OAuth config (external — user does in dashboards)
-See `AUTH.md`. Summary:
-- Create a GitHub OAuth App. Callback URL =
-  `https://biffxhtytzdcfsbxscwm.supabase.co/auth/v1/callback`.
-- Supabase → Auth → Providers → GitHub: enable, paste Client ID + Secret.
-- Supabase → Auth → URL Configuration: Site URL + Redirect URLs must include
-  `http://localhost:5173` and the future `*.pages.dev` URL.
-- Then restart `bun run dev` and confirm the GitHub login screen works.
+### 1. ✅ GitHub OAuth configured and confirmed
+GitHub OAuth App created (Client ID `Ov23lifcWunDWXoWBAXx`; credentials note in
+`MyVault/Secrets/github-auth-key.md`). Provider enabled + Site URL/redirect
+URLs set via the Supabase Management API (CLI keychain token, `PATCH
+/v1/projects/{ref}/config/auth`) — not the dashboard. Redirect allow-list:
+`http://localhost:5173` and `https://aero-mro.pages.dev` (each with `/**`).
+User confirmed a real GitHub login works on the live site.
 
-### 2. Lock RLS to authenticated-only (via Supabase MCP in this session)
-**Only after GitHub login is confirmed working**, or you lock yourself out.
-Apply this SQL through the Supabase MCP:
+### 2. ✅ RLS locked to authenticated-only
+Applied as migration `20260710214047_lock_rls_authenticated` (remote via MCP,
+mirrored in `supabase/migrations/`). Verified: all ten tables have exactly one
+policy `auth_all` scoped to `authenticated`; anonymous REST reads with the
+publishable key now return `[]`.
 
-```sql
-do $$
-declare t text;
-begin
-  foreach t in array array[
-    'aircraft','engineers','defects','parts','work_orders','task_cards',
-    'crs_releases','airworthiness_directives','ad_compliance','audit_log'
-  ] loop
-    execute format('drop policy if exists "demo_all" on %I;', t);
-    execute format('create policy "auth_all" on %I for all to authenticated using (true) with check (true);', t);
-  end loop;
-end $$;
-```
-
-Then verify via `pg_policies`: each of the ten tables should have exactly one
-policy `auth_all` scoped to role `authenticated`, and no `demo_all` / `anon`
-policy remaining. (If the MCP is read-only, append `&read_only=false` to the URL
-in `.mcp.json` and re-authenticate.)
-
-### 3. ✅ DONE 2026-07-10 — Deployed to Cloudflare Pages
+### 3. ✅ Deployed to Cloudflare Pages
 Live at **https://aero-mro.pages.dev** (account david.oliver@ba.com). Verified:
 200 + SPA fallback working. Note: newer Wrangler delegates Pages deploys to
 Workers and demands Vite ≥6, so the deploy script now carries `--force` to
 target classic Pages directly.
-- Remaining: add `https://aero-mro.pages.dev` to the GitHub OAuth App homepage
-  + Supabase redirect URLs (part of step 1).
 
 ## Open decisions / possible next work
 
