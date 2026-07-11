@@ -150,69 +150,115 @@ export default function Defects({
       </div>
 
       <h2>Register</h2>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Aircraft</th>
-              <th>Description</th>
-              <th>ATA</th>
-              <th>Severity</th>
-              <th>Status</th>
-              <th>MEL clock</th>
-              <th>WO</th>
-              <th>Raised</th>
-            </tr>
-          </thead>
-          <tbody>
-            {store.defects.map((d) => {
-              const clock = melClock(d);
-              const wo = store.workOrders.find((w) => w.source_defect === d.id);
-              return (
-                <tr key={d.id} className={focus === d.id ? "row-focus" : ""}>
-                  <td>
-                    <EntityLink onClick={() => go("fleet", d.aircraft_id)} title="View aircraft in Fleet">
-                      {acName(d.aircraft_id)}
-                    </EntityLink>
-                  </td>
-                  <td style={{ maxWidth: 320 }}>
-                    {d.description} {d.ai_triaged && <span className="ai-tag" title="AI-triaged">✨</span>}
-                  </td>
-                  <td>{d.ata_chapter ?? "—"}</td>
-                  <td>
-                    <Pill tone={d.severity === "critical" ? "danger" : d.severity === "major" ? "warn" : "muted"}>
-                      {d.severity}
-                    </Pill>
-                  </td>
-                  <td>
-                    <Pill tone={d.status === "open" ? "warn" : d.status === "deferred" ? "info" : "ok"}>{d.status}</Pill>
-                  </td>
-                  <td>
-                    {clock ? (
-                      <Pill tone={clock.tone}>
-                        {clock.daysRemaining !== null && clock.daysRemaining < 0
-                          ? `${Math.abs(clock.daysRemaining)}d overdue`
-                          : `${clock.daysRemaining}d left`}
-                      </Pill>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </td>
-                  <td>
-                    {wo ? (
-                      <EntityLink onClick={() => go("workorders", wo.id)} title="Open work order">
-                        {wo.wo_number}
+      <div className="desktop-only">
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Aircraft</th>
+                <th>Description</th>
+                <th>ATA</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>MEL clock</th>
+                <th>WO</th>
+                <th>Raised</th>
+              </tr>
+            </thead>
+            <tbody>
+              {store.defects.map((d) => {
+                const clock = melClock(d);
+                const wo = store.workOrders.find((w) => w.source_defect === d.id);
+                return (
+                  <tr key={d.id} className={focus === d.id ? "row-focus" : ""}>
+                    <td>
+                      <EntityLink onClick={() => go("fleet", d.aircraft_id)} title="View aircraft in Fleet">
+                        {acName(d.aircraft_id)}
                       </EntityLink>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </td>
-                  <td className="muted">{new Date(d.raised_at).toLocaleDateString("en-GB")}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td style={{ maxWidth: 320 }}>
+                      {d.description} {d.ai_triaged && <span className="ai-tag" title="AI-triaged">✨</span>}
+                    </td>
+                    <td>{d.ata_chapter ?? "—"}</td>
+                    <td>
+                      <Pill tone={d.severity === "critical" ? "danger" : d.severity === "major" ? "warn" : "muted"}>
+                        {d.severity}
+                      </Pill>
+                    </td>
+                    <td>
+                      <Pill tone={d.status === "open" ? "warn" : d.status === "deferred" ? "info" : "ok"}>{d.status}</Pill>
+                    </td>
+                    <td>
+                      {clock ? (
+                        <Pill tone={clock.tone}>
+                          {clock.daysRemaining !== null && clock.daysRemaining < 0
+                            ? `${Math.abs(clock.daysRemaining)}d overdue`
+                            : `${clock.daysRemaining}d left`}
+                        </Pill>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td>
+                      {wo ? (
+                        <EntityLink onClick={() => go("workorders", wo.id)} title="Open work order">
+                          {wo.wo_number}
+                        </EntityLink>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td className="muted">{new Date(d.raised_at).toLocaleDateString("en-GB")}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="mobile-only">
+        {store.defects.map((d) => {
+          const clock = melClock(d);
+          const wo = store.workOrders.find((w) => w.source_defect === d.id);
+          return (
+            <div
+              key={d.id}
+              className="card"
+              style={{ marginBottom: 10, ...(focus === d.id ? { borderColor: "var(--accent)" } : {}) }}
+            >
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <EntityLink onClick={() => go("fleet", d.aircraft_id)} title="View aircraft in Fleet">
+                  {acName(d.aircraft_id)}
+                </EntityLink>
+                <Pill tone={d.status === "open" ? "warn" : d.status === "deferred" ? "info" : "ok"}>{d.status}</Pill>
+              </div>
+              <div style={{ fontSize: 13, marginTop: 6 }}>
+                {d.description} {d.ai_triaged && <span className="ai-tag" title="AI-triaged">✨</span>}
+              </div>
+              <div className="row" style={{ marginTop: 8 }}>
+                <Pill tone={d.severity === "critical" ? "danger" : d.severity === "major" ? "warn" : "muted"}>
+                  {d.severity}
+                </Pill>
+                {clock && (
+                  <Pill tone={clock.tone}>
+                    {clock.daysRemaining !== null && clock.daysRemaining < 0
+                      ? `${Math.abs(clock.daysRemaining)}d overdue`
+                      : `${clock.daysRemaining}d left`}
+                  </Pill>
+                )}
+                {wo && (
+                  <EntityLink onClick={() => go("workorders", wo.id)} title="Open work order">
+                    {wo.wo_number}
+                  </EntityLink>
+                )}
+              </div>
+              <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
+                ATA {d.ata_chapter ?? "—"} · Raised {new Date(d.raised_at).toLocaleDateString("en-GB")}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </>
   );

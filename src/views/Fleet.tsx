@@ -26,7 +26,7 @@ export default function Fleet({
       .filter((c) => c.aircraft_id === aircraftId)
       .map((c) => {
         const task = store.mpTasks.find((t) => t.id === c.mp_task_id);
-        const ac = store.aircraft.find((a) => a.id === aircraftId);
+        const ac = store.aircraftById.get(aircraftId);
         return task && ac ? mpDue(task, c, ac) : null;
       })
       .filter((x): x is DueItem => x !== null);

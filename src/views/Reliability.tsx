@@ -143,7 +143,7 @@ export default function Reliability({ store }: { store: Store }) {
       ) : (
         <div className="grid" style={{ gridTemplateColumns: "1fr" }}>
           {chronicGroups.map((g) => {
-            const ac = store.aircraft.find((a) => a.id === g.aircraftId);
+            const ac = store.aircraftById.get(g.aircraftId);
             return (
               <div
                 key={`${g.aircraftId}|${g.ataChapter}`}

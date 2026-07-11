@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { Store } from "../App";
 import type { AuditFinding } from "../lib/types";
 import { supabase } from "../lib/supabase";
+import { logAudit } from "../lib/audit";
 import { daysUntil } from "../lib/compliance";
 import { EmptyState, Pill, StatCard } from "../components/ui";
 
@@ -51,12 +52,12 @@ export default function Quality({ store, reload }: { store: Store; reload: () =>
         .update({ status: "closed", closed_at: new Date().toISOString() })
         .eq("id", finding.id);
       if (e1) throw e1;
-      await supabase.from("audit_log").insert({
-        entity: "audit_findings",
-        action: "Finding closed",
-        actor: "Quality",
-        detail: `${auditRef}: finding closed`,
-      });
+      await logAudit(
+        "audit_findings",
+        "Finding closed",
+        "Quality",
+        `${auditRef}: finding closed`,
+      );
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

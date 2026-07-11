@@ -1,0 +1,13 @@
+name = "aero-mro-ai-proxy"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+
+# Deploy:
+#   cd workers/ai-proxy
+#   bunx wrangler secret put ANTHROPIC_API_KEY
+#   bunx wrangler deploy
+# Then set VITE_AI_PROXY_URL=https://aero-mro-ai-proxy.<account>.workers.dev
+# in .env.local (and the Pages build env) — the browser never sees the key.
+
+[vars]
+ALLOWED_ORIGIN = "https://aero-mro.pages.dev"

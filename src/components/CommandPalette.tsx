@@ -142,7 +142,8 @@ export default function CommandPalette({
           placeholder="Search aircraft, defects, WOs, parts… or ask AI"
           aria-label="Search"
           onKeyDown={(e) => {
-            if (e.key === "Escape") onClose();
+            if (e.key === "Tab") e.preventDefault(); // focus stays in the dialog
+            else if (e.key === "Escape") onClose();
             else if (e.key === "ArrowDown") { e.preventDefault(); setCursor((c) => Math.min(c + 1, results.length - 1)); }
             else if (e.key === "ArrowUp") { e.preventDefault(); setCursor((c) => Math.max(c - 1, 0)); }
             else if (e.key === "Enter" && results[cursor]) pick(results[cursor]);

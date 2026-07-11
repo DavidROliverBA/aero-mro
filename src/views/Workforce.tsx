@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Store } from "../App";
 import { supabase } from "../lib/supabase";
+import { logAudit } from "../lib/audit";
 import {
   baseManHours,
   coverageGaps,
@@ -68,13 +69,12 @@ export default function Workforce({
         { onConflict: "engineer_id,duty_date" },
       );
       if (e1) throw e1;
-      const { error: e2 } = await supabase.from("audit_log").insert({
-        entity: "roster_entries",
-        action: "Roster amended",
-        actor: "Workforce planning",
-        detail: `${eng.full_name} (${eng.staff_no}) → ${formShift} at ${formBase} on ${formDate}`,
-      });
-      if (e2) throw e2;
+      await logAudit(
+        "roster_entries",
+        "Roster amended",
+        "Workforce planning",
+        `${eng.full_name} (${eng.staff_no}) → ${formShift} at ${formBase} on ${formDate}`,
+      );
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

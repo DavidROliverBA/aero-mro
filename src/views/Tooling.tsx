@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Store } from "../App";
 import { supabase } from "../lib/supabase";
+import { logAudit } from "../lib/audit";
 import { daysUntil, toolCheck } from "../lib/compliance";
 import { Pill, StatCard } from "../components/ui";
 
@@ -31,12 +32,12 @@ export default function Tooling({ store, reload }: { store: Store; reload: () =>
     try {
       const { error: e1 } = await supabase.from("tools").update({ condition: "quarantine" }).eq("id", toolId);
       if (e1) throw e1;
-      await supabase.from("audit_log").insert({
-        entity: "tools",
-        action: "Tool quarantined",
-        actor: "Tooling control",
-        detail: `${tool.tool_no} ${tool.description} quarantined`,
-      });
+      await logAudit(
+        "tools",
+        "Tool quarantined",
+        "Tooling control",
+        `${tool.tool_no} ${tool.description} quarantined`,
+      );
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -53,12 +54,12 @@ export default function Tooling({ store, reload }: { store: Store; reload: () =>
     try {
       const { error: e1 } = await supabase.from("tools").update({ condition: "serviceable" }).eq("id", toolId);
       if (e1) throw e1;
-      await supabase.from("audit_log").insert({
-        entity: "tools",
-        action: "Tool returned to service",
-        actor: "Tooling control",
-        detail: `${tool.tool_no} ${tool.description} returned to service`,
-      });
+      await logAudit(
+        "tools",
+        "Tool returned to service",
+        "Tooling control",
+        `${tool.tool_no} ${tool.description} returned to service`,
+      );
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

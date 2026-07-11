@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Store, Tab } from "../App";
 import { supabase } from "../lib/supabase";
-import { rollOntoAircraft } from "../lib/actions";
+import { logAudit } from "../lib/audit";
 import { EntityLink, Pill, StatCard, EmptyState } from "../components/ui";
 
 export default function TechLog({
@@ -58,16 +58,15 @@ export default function TechLog({
     setClosingId(flightId);
     setError(null);
     try {
+      // The DB trigger rolls FH/FC onto the airframe on the open→closed transition.
       const { error: e1 } = await supabase.from("flights").update({ status: "closed" }).eq("id", flightId);
       if (e1) throw e1;
-      await rollOntoAircraft(flight.aircraft_id, Number(flight.block_hours), flight.cycles);
-      const { error: e3 } = await supabase.from("audit_log").insert({
-        entity: "flights",
-        action: "Tech log sector closed",
-        actor: "Tech log",
-        detail: `${flight.flight_no} ${flight.dep}-${flight.arr} closed, ${flight.block_hours} FH rolled to ${ac?.registration ?? flight.aircraft_id}`,
-      });
-      if (e3) throw e3;
+      await logAudit(
+        "flights",
+        "Tech log sector closed",
+        "Tech log",
+        `${flight.flight_no} ${flight.dep}-${flight.arr} closed, ${flight.block_hours} FH rolled to ${ac?.registration ?? flight.aircraft_id}`,
+      );
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -112,14 +111,13 @@ export default function TechLog({
         status: "closed",
       });
       if (e1) throw e1;
-      await rollOntoAircraft(formAircraftId, hours, 1);
-      const { error: e3 } = await supabase.from("audit_log").insert({
-        entity: "flights",
-        action: "Tech log sector recorded",
-        actor: captain.trim() || "Tech log",
-        detail: `${flightNo.trim()} ${dep.trim().toUpperCase()}-${arr.trim().toUpperCase()} recorded, ${hours} FH rolled to ${ac?.registration ?? formAircraftId}`,
-      });
-      if (e3) throw e3;
+      // FH/FC roll-up happens in the DB trigger on the closed insert.
+      await logAudit(
+        "flights",
+        "Tech log sector recorded",
+        captain.trim() || "Tech log",
+        `${flightNo.trim()} ${dep.trim().toUpperCase()}-${arr.trim().toUpperCase()} recorded, ${hours} FH rolled to ${ac?.registration ?? formAircraftId}`,
+      );
       resetForm();
       await reload();
     } catch (e) {

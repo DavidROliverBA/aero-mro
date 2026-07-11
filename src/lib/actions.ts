@@ -3,6 +3,7 @@
 // written to the audit log attributed "via AI assistant (confirmed by <user>)".
 
 import { supabase } from "./supabase";
+import { logAudit } from "./audit";
 import type { ProposedAction } from "./ai";
 import type { Engineer, TaskCard } from "./types";
 import type { Store } from "../App";
@@ -10,7 +11,20 @@ import type { Store } from "../App";
 // Short refs keep the snapshot small and give the model stable handles.
 const ref = (id: string) => id.slice(0, 8);
 
+// Memoised per store identity: the snapshot is resent as system-prompt content
+// on every agent turn, so an unchanged store must produce the identical string
+// (keeps Anthropic prompt caching effective and skips the O(n·m) rebuild).
+let snapshotFor: Store | null = null;
+let snapshotCache = "";
+
 export function buildSnapshot(store: Store): string {
+  if (store === snapshotFor) return snapshotCache;
+  snapshotFor = store;
+  snapshotCache = computeSnapshot(store);
+  return snapshotCache;
+}
+
+function computeSnapshot(store: Store): string {
   return JSON.stringify({
     today: new Date().toISOString().slice(0, 10),
     aircraft: store.aircraft.map((a) => ({
@@ -99,38 +113,17 @@ export async function signCard(
       : { status: "inspected", inspected_by: eng.id, inspected_at: new Date().toISOString() };
   const { error } = await supabase.from("task_cards").update(patch).eq("id", card.id);
   if (error) throw error;
-  const { error: e2 } = await supabase.from("audit_log").insert({
-    entity: "task_cards",
-    action: kind === "completion" ? "Task signed off" : "Independent inspection signed",
-    actor: `${eng.full_name} (${eng.part66_licence_no})`,
-    detail: `${woNumber} card ${card.sequence}: ${card.description}`,
-  });
-  if (e2) throw e2;
+  await logAudit(
+    "task_cards",
+    kind === "completion" ? "Task signed off" : "Independent inspection signed",
+    `${eng.full_name} (${eng.part66_licence_no})`,
+    `${woNumber} card ${card.sequence}: ${card.description}`,
+  );
 }
 
-// Rolls sector hours/cycles onto the airframe. Reads the aircraft fresh from
-// the DB first, so rapid successive closes don't overwrite each other with
-// stale absolute totals (the React store lags behind writes).
-export async function rollOntoAircraft(
-  aircraftId: string,
-  hours: number,
-  cycles: number,
-): Promise<{ totalHours: number; totalCycles: number }> {
-  const { data, error } = await supabase
-    .from("aircraft")
-    .select("total_hours,total_cycles")
-    .eq("id", aircraftId)
-    .single();
-  if (error) throw error;
-  const totalHours = Number(data.total_hours) + hours;
-  const totalCycles = data.total_cycles + cycles;
-  const { error: e2 } = await supabase
-    .from("aircraft")
-    .update({ total_hours: totalHours, total_cycles: totalCycles })
-    .eq("id", aircraftId);
-  if (e2) throw e2;
-  return { totalHours, totalCycles };
-}
+// FH/FC roll-up now lives in the database (trg_roll_flight fires when a sector
+// is inserted closed or transitions open→closed) — one source of truth for
+// every write path: this app, the MCP server, and any future client.
 
 // Human-readable one-liner for the confirmation card.
 export function describeAction(a: ProposedAction): string {
@@ -167,12 +160,7 @@ export async function executeAction(
     return ac;
   };
   const audit = (action: string, detail: string) =>
-    supabase.from("audit_log").insert({
-      entity: a.tool,
-      action,
-      actor: `AI assistant (confirmed by ${confirmedBy})`,
-      detail,
-    });
+    logAudit(a.tool, action, `AI assistant (confirmed by ${confirmedBy})`, detail);
 
   switch (a.tool) {
     case "create_defect": {
@@ -192,32 +180,27 @@ export async function executeAction(
     }
     case "create_work_order": {
       const ac = findAircraft();
-      // Number from a fresh query, not the possibly-stale store, to avoid
-      // duplicate WO numbers when several are created between reloads.
-      const { data: latest, error: eNum } = await supabase
-        .from("work_orders")
-        .select("wo_number")
-        .order("wo_number", { ascending: false })
-        .limit(1);
-      if (eNum) throw eNum;
-      const next = parseInt(latest?.[0]?.wo_number.split("-").pop() ?? "0", 10) + 1;
-      const woNumber = `WO-${new Date().getFullYear()}-${String(next).padStart(4, "0")}`;
       let sourceDefect: string | null = null;
       if (i.source_defect_ref) {
         sourceDefect =
           store.defects.find((d) => d.id.startsWith(str(i.source_defect_ref)))?.id ?? null;
       }
-      const { error } = await supabase.from("work_orders").insert({
-        wo_number: woNumber,
-        aircraft_id: ac.id,
-        title: str(i.title),
-        wo_type: str(i.wo_type),
-        status: "open",
-        source_defect: sourceDefect,
-      });
+      // wo_number comes from the DB default (next_wo_number() sequence) —
+      // race-free even with concurrent clients.
+      const { data, error } = await supabase
+        .from("work_orders")
+        .insert({
+          aircraft_id: ac.id,
+          title: str(i.title),
+          wo_type: str(i.wo_type),
+          status: "open",
+          source_defect: sourceDefect,
+        })
+        .select("wo_number")
+        .single();
       if (error) throw error;
-      await audit("Work order opened", `${woNumber} on ${ac.registration}: ${str(i.title)}`);
-      return `${woNumber} opened on ${ac.registration}.`;
+      await audit("Work order opened", `${data.wo_number} on ${ac.registration}: ${str(i.title)}`);
+      return `${data.wo_number} opened on ${ac.registration}.`;
     }
     case "add_task_card": {
       const wo = store.workOrders.find((w) => w.wo_number === str(i.wo_number));
@@ -261,10 +244,15 @@ export async function executeAction(
         remarks: i.remarks ? str(i.remarks) : null,
       });
       if (error) throw error;
-      // Closed sectors roll hours/cycles onto the airframe.
-      const { totalHours, totalCycles } = await rollOntoAircraft(ac.id, hours, 1);
+      // The DB trigger rolls hours/cycles onto the airframe; read back totals.
+      const { data: fresh, error: e2 } = await supabase
+        .from("aircraft")
+        .select("total_hours,total_cycles")
+        .eq("id", ac.id)
+        .single();
+      if (e2) throw e2;
       await audit("Tech log sector recorded", `${str(i.flight_no)} ${str(i.dep)}-${str(i.arr)} on ${ac.registration}, ${hours} FH`);
-      return `Sector recorded — ${ac.registration} now ${totalHours.toFixed(1)} FH / ${totalCycles} FC.`;
+      return `Sector recorded — ${ac.registration} now ${Number(fresh.total_hours).toFixed(1)} FH / ${fresh.total_cycles} FC.`;
     }
     case "update_aircraft_status": {
       const ac = findAircraft();

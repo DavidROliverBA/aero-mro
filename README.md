@@ -102,10 +102,12 @@ throughout.
 
 ### 1. Database
 
-Migrations in `supabase/migrations/` are the source of truth (applied via the
-Supabase CLI or MCP). For a fresh project you can instead paste
-`supabase/schema.sql` + `supabase/seed.sql` into the SQL editor, then apply the
-later migrations on top.
+`supabase/migrations/` is the single source of truth — apply in order via the
+Supabase CLI or MCP. The final state includes RLS restricted to an
+`allowed_users` GitHub allow-list, an append-only audit log, DB-enforced
+invariants (FH/FC roll-up trigger, WO numbering sequence, unique card
+sequence, independent-inspector constraint) and the `reset_demo_data()`
+function.
 
 ### 2. Auth
 
@@ -146,9 +148,10 @@ docs/
   architecture.md     how the pieces fit
   ai-design.md        the UI-vs-AI decision framework
   compliance-map.md   feature → regulation traceability
-supabase/
-  schema.sql seed.sql     original base model
-  migrations/             source of truth (schema, RLS lockdown, modules)
+supabase/migrations/  the database, in order (schema → RLS → modules → hardening)
+workers/ai-proxy/     Cloudflare Worker keeping the Claude key server-side
+mcp/                  stdio MCP server + smoke test
+tests/                Playwright UX suites (desktop + iPhone) + auth helper
 src/
   lib/
     supabase.ts       client

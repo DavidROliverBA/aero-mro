@@ -12,15 +12,16 @@ const THEMES: { value: ThemePref; label: string; hint: string }[] = [
 export default function Settings({
   reload,
   keySet,
-  onNeedKey,
+  onSetKey,
 }: {
   reload: () => Promise<void>;
   keySet: boolean;
-  onNeedKey: () => void;
+  onSetKey: (k: string) => void;
 }) {
   const [theme, setTheme] = useState<ThemePref>(getThemePref());
   const [resetting, setResetting] = useState(false);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
+  const [keyInput, setKeyInput] = useState("");
 
   function chooseTheme(t: ThemePref) {
     setThemePref(t);
@@ -75,14 +76,34 @@ export default function Settings({
 
       <fieldset>
         <legend>AI</legend>
-        <div className="row">
-          <Pill tone={keySet ? "ok" : "muted"}>{keySet ? "Claude key set (in memory)" : "no key"}</Pill>
-          <button className="btn ghost" onClick={onNeedKey}>
-            {keySet ? "Replace key" : "Set Claude API key"}
+        <div className="row" style={{ alignItems: "flex-end" }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <label htmlFor="st-key">Claude API key</label>
+            <input
+              id="st-key"
+              type="password"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              placeholder="sk-ant-…"
+              autoComplete="off"
+            />
+          </div>
+          <button
+            className="btn"
+            disabled={!keyInput.trim()}
+            onClick={() => {
+              onSetKey(keyInput.trim());
+              setKeyInput("");
+            }}
+          >
+            {keySet ? "Replace key" : "Set key"}
           </button>
+          <Pill tone={keySet ? "ok" : "muted"}>{keySet ? "key set (in memory)" : "no key"}</Pill>
         </div>
         <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
-          The key is held in memory only and is gone on refresh — it is never stored.
+          Held in memory only and gone on refresh — never stored. For a key that never
+          touches the browser at all, deploy <code>workers/ai-proxy</code> and set{" "}
+          <code>VITE_AI_PROXY_URL</code>.
         </p>
       </fieldset>
 

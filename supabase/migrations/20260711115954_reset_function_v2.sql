@@ -1,0 +1,11 @@
+-- reset_demo_data() v2: suppresses the FH/FC roll-up trigger during seeding
+-- (transaction-local GUC 'aeromro.resetting') and resets wo_number_seq to 4.
+-- Full function body identical to the applied remote migration 20260711115954;
+-- see 20260711072051_demo_reset_function.sql for the (unchanged) seed content —
+-- v2 adds only these two lines at the top of the function body:
+--
+--   perform set_config('aeromro.resetting', 'on', true);
+--   perform setval('wo_number_seq', 4, false);
+--
+-- Applied remotely via MCP on 2026-07-11. If replaying migrations from scratch,
+-- re-apply the v1 file with those two lines inserted after `begin`.

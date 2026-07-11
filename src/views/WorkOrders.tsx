@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Store, Tab } from "../App";
 import { supabase } from "../lib/supabase";
+import { logAudit } from "../lib/audit";
+import { signCard } from "../lib/actions";
 import { draftCrsStatement } from "../lib/ai";
 import { checkCertifyingPrivilege, crsBlockers } from "../lib/compliance";
 import { EntityLink, Pill } from "../components/ui";
@@ -57,18 +59,7 @@ export default function WorkOrders({
     setSigningCard(card.id);
     setMsg(null);
     try {
-      const now = new Date().toISOString();
-      const { error: e1 } = await supabase
-        .from("task_cards")
-        .update({ status: "complete", completed_by: actingEng.id, completed_at: now })
-        .eq("id", card.id);
-      if (e1) throw e1;
-      await supabase.from("audit_log").insert({
-        entity: "task_cards",
-        action: "Task signed off",
-        actor: `${actingEng.full_name} (${actingEng.part66_licence_no})`,
-        detail: `${wo.wo_number} card ${card.sequence}: ${card.description}`,
-      });
+      await signCard(card, actingEng, "completion", wo.wo_number);
       await reload();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
@@ -82,18 +73,7 @@ export default function WorkOrders({
     setSigningCard(card.id);
     setMsg(null);
     try {
-      const now = new Date().toISOString();
-      const { error: e1 } = await supabase
-        .from("task_cards")
-        .update({ status: "inspected", inspected_by: actingEng.id, inspected_at: now })
-        .eq("id", card.id);
-      if (e1) throw e1;
-      await supabase.from("audit_log").insert({
-        entity: "task_cards",
-        action: "Independent inspection signed",
-        actor: `${actingEng.full_name} (${actingEng.part66_licence_no})`,
-        detail: `${wo.wo_number} card ${card.sequence}: ${card.description}`,
-      });
+      await signCard(card, actingEng, "inspection", wo.wo_number);
       await reload();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
@@ -138,12 +118,12 @@ export default function WorkOrders({
       if (e1) throw e1;
       const { error: e2 } = await supabase.from("work_orders").update({ status: "closed", closed_at: new Date().toISOString() }).eq("id", wo.id);
       if (e2) throw e2;
-      await supabase.from("audit_log").insert({
-        entity: "crs_releases",
-        action: "CRS issued",
-        actor: `${eng.full_name} (${eng.part66_licence_no})`,
-        detail: `${wo.wo_number} released to service`,
-      });
+      await logAudit(
+        "crs_releases",
+        "CRS issued",
+        `${eng.full_name} (${eng.part66_licence_no})`,
+        `${wo.wo_number} released to service`,
+      );
       setStatement("");
       setEngId("");
       setMsg("CRS issued — work order closed and released to service.");

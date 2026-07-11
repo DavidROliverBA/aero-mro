@@ -57,6 +57,9 @@ export interface Store {
   audits: Audit[];
   auditFindings: AuditFinding[];
   roster: RosterEntry[];
+  // Lookup maps so views don't O(n) .find() inside render loops.
+  aircraftById: Map<string, Aircraft>;
+  engineersById: Map<string, Engineer>;
 }
 
 const EMPTY: Store = {
@@ -76,6 +79,8 @@ const EMPTY: Store = {
   audits: [],
   auditFindings: [],
   roster: [],
+  aircraftById: new Map(),
+  engineersById: new Map(),
 };
 
 export type Tab =
@@ -216,6 +221,8 @@ export default function App() {
         audits: audits.data ?? [],
         auditFindings: auditFindings.data ?? [],
         roster: roster.data ?? [],
+        aircraftById: new Map((aircraft.data ?? []).map((a: Aircraft) => [a.id, a])),
+        engineersById: new Map((engineers.data ?? []).map((e: Engineer) => [e.id, e])),
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -317,17 +324,21 @@ export default function App() {
     },
   ];
   const ALL_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
-  const PRIMARY: Tab[] = ["dashboard", "mywork", "defects", "workorders"];
+  // Fleet carries the AOG badge — it earns a thumb-reachable slot.
+  const PRIMARY: Tab[] = ["dashboard", "fleet", "mywork", "defects", "workorders"];
   const primaryItems = PRIMARY.map((id) => ALL_ITEMS.find((n) => n.id === id)!);
   const moreBadge = ALL_ITEMS.filter((n) => !PRIMARY.includes(n.id))
     .reduce((s, n) => s + (n.badge ?? 0), 0);
 
+  // Key entry lives in Settings (a proper field — window.prompt was jarring
+  // on mobile). Anything that needs a key routes the user there.
   function handleKey() {
-    const k = prompt("Paste a Claude API key (sk-ant-…). Held in memory only, never stored.");
-    if (k) {
-      setApiKey(k);
-      setKeySet(hasApiKey());
-    }
+    go("settings");
+  }
+
+  function onSetKey(k: string) {
+    setApiKey(k);
+    setKeySet(hasApiKey());
   }
 
   function go(t: Tab, focusId?: string) {
@@ -368,7 +379,7 @@ export default function App() {
       {tab === "quality" && <Quality store={store} reload={reload} />}
       {tab === "engineers" && <Engineers store={store} />}
       {tab === "workforce" && <Workforce store={store} reload={reload} />}
-      {tab === "settings" && <Settings reload={reload} keySet={keySet} onNeedKey={handleKey} />}
+      {tab === "settings" && <Settings reload={reload} keySet={keySet} onSetKey={onSetKey} />}
       {tab === "assistant" && (
         <Assistant
           store={store}
@@ -414,7 +425,7 @@ export default function App() {
                 >
                   <span aria-hidden>{n.icon}</span>
                   {n.label}
-                  {n.badge ? <span className="badge" aria-label={`${n.badge} items need attention`}>{n.badge}</span> : null}
+                  {n.badge ? <span className="badge" aria-label={`${n.badge} urgent items needing attention`}>{n.badge}</span> : null}
                 </button>
               ))}
             </div>
@@ -465,6 +476,11 @@ export default function App() {
         {loading ? <p className="spinner" role="status">Loading fleet data…</p> : view}
       </main>
 
+      {/* Mobile floating search/AI action — thumb-reachable, unlike the header */}
+      <button className="fab" onClick={() => setPaletteOpen(true)} aria-label="Search or ask AI">
+        🔎✨
+      </button>
+
       {/* Mobile bottom tab bar */}
       <nav className="tabbar" aria-label="Primary">
         {primaryItems.map((n) => (
@@ -494,7 +510,13 @@ export default function App() {
       {helpOpen && (
         <>
           <div className="sheet-backdrop" onClick={() => setHelpOpen(false)} aria-hidden />
-          <div className="kbd-help" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+          <div
+            className="kbd-help"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Keyboard shortcuts"
+            onKeyDown={(e) => e.key === "Tab" && e.preventDefault()}
+          >
             <h3>Keyboard shortcuts</h3>
             <div className="kbd-grid">
               <div><kbd>⌘K</kbd> or <kbd>/</kbd></div><div>Search everything</div>

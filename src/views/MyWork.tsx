@@ -26,7 +26,7 @@ export default function MyWork({
   const [meId, setMeId] = useState<string>(() => localStorage.getItem(PERSONA_KEY) ?? "");
   const [busyCard, setBusyCard] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const me = store.engineers.find((e) => e.id === meId);
+  const me = store.engineersById.get(meId);
 
   function choose(id: string) {
     setMeId(id);
@@ -39,7 +39,7 @@ export default function MyWork({
   const woById = (id: string) => store.workOrders.find((w) => w.id === id);
   const acOfWo = (woId: string) => {
     const wo = woById(woId);
-    return wo ? store.aircraft.find((a) => a.id === wo.aircraft_id) : undefined;
+    return wo ? store.aircraftById.get(wo.aircraft_id) : undefined;
   };
 
   // Cards on my plate: assigned to me and not fully signed off.
@@ -194,7 +194,7 @@ export default function MyWork({
                   {inspectable.map((t) => {
                     const wo = woById(t.work_order_id);
                     const ac = acOfWo(t.work_order_id);
-                    const performer = store.engineers.find((e) => e.id === t.completed_by);
+                    const performer = t.completed_by ? store.engineersById.get(t.completed_by) : undefined;
                     return (
                       <tr key={t.id}>
                         <td>{wo?.wo_number}</td>

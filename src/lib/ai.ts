@@ -8,6 +8,10 @@
 const API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-opus-4-8";
 
+// Optional server-side proxy (workers/ai-proxy). When VITE_AI_PROXY_URL is
+// set, requests go there with no key in the browser at all.
+const PROXY_URL = (import.meta.env.VITE_AI_PROXY_URL as string) || null;
+
 let runtimeKey: string | null =
   (import.meta.env.VITE_ANTHROPIC_API_KEY as string) || null;
 
@@ -15,7 +19,7 @@ export function setApiKey(k: string) {
   runtimeKey = k.trim() || null;
 }
 export function hasApiKey(): boolean {
-  return !!runtimeKey;
+  return !!PROXY_URL || !!runtimeKey;
 }
 
 interface AnthropicBlock {
@@ -28,16 +32,18 @@ interface AnthropicResponse {
 }
 
 async function callClaude(body: Record<string, unknown>): Promise<AnthropicResponse> {
-  if (!runtimeKey) throw new Error("No Claude API key set — paste one in the AI panel.");
-  const res = await fetch(API_URL, {
+  if (!PROXY_URL && !runtimeKey)
+    throw new Error("No Claude API key set — add one in Settings.");
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (!PROXY_URL) {
+    headers["x-api-key"] = runtimeKey!;
+    headers["anthropic-version"] = "2023-06-01";
+    // Required for browser-origin requests to the Anthropic API:
+    headers["anthropic-dangerous-direct-browser-access"] = "true";
+  }
+  const res = await fetch(PROXY_URL ?? API_URL, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": runtimeKey,
-      "anthropic-version": "2023-06-01",
-      // Required for browser-origin requests to the Anthropic API:
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
+    headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) {

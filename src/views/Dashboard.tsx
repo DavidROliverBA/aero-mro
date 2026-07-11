@@ -65,7 +65,7 @@ export default function Dashboard({
 
   const overdueChecks = store.mpCompliance.filter((c) => {
     const task = store.mpTasks.find((t) => t.id === c.mp_task_id);
-    const ac = store.aircraft.find((a) => a.id === c.aircraft_id);
+    const ac = store.aircraftById.get(c.aircraft_id);
     return task && ac && mpDue(task, c, ac).tone === "danger";
   });
 
@@ -99,7 +99,7 @@ export default function Dashboard({
   for (const d of store.defects) {
     const c = melClock(d);
     if (c && (c.tone === "danger" || c.tone === "warn")) {
-      const ac = store.aircraft.find((a) => a.id === d.aircraft_id);
+      const ac = store.aircraftById.get(d.aircraft_id);
       attention.push({
         id: `mel-${d.id}`,
         tone: c.tone,
@@ -112,7 +112,7 @@ export default function Dashboard({
 
   for (const al of adAlerts) {
     if (al.tone !== "danger") continue;
-    const ac = store.aircraft.find((a) => a.id === al.compliance.aircraft_id);
+    const ac = store.aircraftById.get(al.compliance.aircraft_id);
     attention.push({
       id: `ad-${al.compliance.id}`,
       tone: "danger",
@@ -124,7 +124,7 @@ export default function Dashboard({
 
   for (const c of overdueChecks) {
     const task = store.mpTasks.find((t) => t.id === c.mp_task_id);
-    const ac = store.aircraft.find((a) => a.id === c.aircraft_id);
+    const ac = store.aircraftById.get(c.aircraft_id);
     if (!task || !ac) continue;
     attention.push({
       id: `mp-${c.id}`,
@@ -138,7 +138,7 @@ export default function Dashboard({
   for (const llp of store.llps) {
     const s = llpStatus(llp);
     if (s.tone !== "danger") continue;
-    const ac = store.aircraft.find((a) => a.id === llp.aircraft_id);
+    const ac = store.aircraftById.get(llp.aircraft_id);
     attention.push({
       id: `llp-${llp.id}`,
       tone: "danger",
@@ -317,7 +317,7 @@ export default function Dashboard({
             </thead>
             <tbody>
               {adAlerts.map((al) => {
-                const ac = store.aircraft.find((a) => a.id === al.compliance.aircraft_id);
+                const ac = store.aircraftById.get(al.compliance.aircraft_id);
                 return (
                   <tr key={al.compliance.id} onClick={() => setTab("directives")} style={{ cursor: "pointer" }}>
                     <td>{al.ad.ad_number}</td>
@@ -336,7 +336,7 @@ export default function Dashboard({
                 );
               })}
               {melBreached.map((d) => {
-                const ac = store.aircraft.find((a) => a.id === d.aircraft_id);
+                const ac = store.aircraftById.get(d.aircraft_id);
                 const c = melClock(d)!;
                 return (
                   <tr key={d.id} onClick={() => setTab("defects")} style={{ cursor: "pointer" }}>

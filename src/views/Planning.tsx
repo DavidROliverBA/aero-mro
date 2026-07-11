@@ -34,7 +34,7 @@ export default function Planning({
   const dueItems: DueItem[] = store.mpCompliance
     .map((c) => {
       const task = store.mpTasks.find((t) => t.id === c.mp_task_id);
-      const ac = store.aircraft.find((a) => a.id === c.aircraft_id);
+      const ac = store.aircraftById.get(c.aircraft_id);
       if (!task || !ac) return null;
       return mpDue(task, c, ac);
     })
@@ -130,7 +130,7 @@ export default function Planning({
           </thead>
           <tbody>
             {llps.map((llp) => {
-              const ac = store.aircraft.find((a) => a.id === llp.aircraft_id);
+              const ac = store.aircraftById.get(llp.aircraft_id);
               const status = llpStatus(llp);
               const limitLabel =
                 llp.limit_fc !== null

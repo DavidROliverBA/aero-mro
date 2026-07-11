@@ -314,24 +314,15 @@ server.tool(
   },
   async (i) => {
     const ac = await findAircraft(i.aircraft_reg);
-    const { data: latest, error: eNum } = await db
+    // wo_number allocated by the DB default (next_wo_number() sequence).
+    const { data, error } = await db
       .from("work_orders")
+      .insert({ aircraft_id: ac.id, title: i.title, wo_type: i.wo_type, status: "open" })
       .select("wo_number")
-      .order("wo_number", { ascending: false })
-      .limit(1);
-    if (eNum) throw new Error(eNum.message);
-    const next = parseInt(latest?.[0]?.wo_number.split("-").pop() ?? "0", 10) + 1;
-    const woNumber = `WO-${new Date().getFullYear()}-${String(next).padStart(4, "0")}`;
-    const { error } = await db.from("work_orders").insert({
-      wo_number: woNumber,
-      aircraft_id: ac.id,
-      title: i.title,
-      wo_type: i.wo_type,
-      status: "open",
-    });
+      .single();
     if (error) throw new Error(error.message);
-    await audit("work_orders", "Work order opened", `${woNumber} on ${ac.registration}: ${i.title}`);
-    return text(`${woNumber} opened on ${ac.registration}.`);
+    await audit("work_orders", "Work order opened", `${data.wo_number} on ${ac.registration}: ${i.title}`);
+    return text(`${data.wo_number} opened on ${ac.registration}.`);
   },
 );
 
@@ -399,17 +390,10 @@ server.tool(
       remarks: i.remarks ?? null,
     });
     if (error) throw new Error(error.message);
-    // Fresh read before the roll-up (same rule as the app).
+    // The DB trigger rolls FH/FC onto the airframe; read back the totals.
     const fresh = await findAircraft(i.aircraft_reg);
-    const totalHours = Number(fresh.total_hours) + i.block_hours;
-    const totalCycles = fresh.total_cycles + 1;
-    const { error: e2 } = await db
-      .from("aircraft")
-      .update({ total_hours: totalHours, total_cycles: totalCycles })
-      .eq("id", ac.id);
-    if (e2) throw new Error(e2.message);
     await audit("flights", "Tech log sector recorded", `${i.flight_no} ${i.dep}-${i.arr} on ${ac.registration}, ${i.block_hours} FH`);
-    return text(`Sector recorded — ${ac.registration} now ${totalHours.toFixed(1)} FH / ${totalCycles} FC.`);
+    return text(`Sector recorded — ${ac.registration} now ${Number(fresh.total_hours).toFixed(1)} FH / ${fresh.total_cycles} FC.`);
   },
 );
 

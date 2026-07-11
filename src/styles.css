@@ -255,6 +255,8 @@ legend { font-size: 12px; color: var(--muted); padding: 0 6px; }
   color: var(--muted);
 }
 .crumbs button:hover { color: var(--accent); }
+.crumbs > button:first-child { color: var(--accent); } /* only the home crumb is interactive */
+.crumbs > span:not([aria-hidden]) { font-style: italic; } /* group segment: visibly inert */
 .crumbs strong { color: var(--text); font-weight: 600; }
 .crumbs .crumbs-help {
   margin-left: auto; border: 1px solid var(--border); border-radius: 50%;
@@ -298,6 +300,23 @@ kbd {
 .banner { background: rgba(210,153,34,0.12); border: 1px solid rgba(210,153,34,0.3); color: var(--warn); padding: 10px 14px; border-radius: 8px; font-size: 12px; margin-bottom: 16px; }
 .banner.danger { background: rgba(248,81,73,0.1); border-color: rgba(248,81,73,0.3); color: var(--danger); }
 code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+/* Responsive visibility helpers + mobile FAB -------------------------------- */
+.mobile-only { display: none; }
+.fab { display: none; }
+@media (max-width: 768px) {
+  .mobile-only { display: block; }
+  .desktop-only { display: none; }
+  .fab {
+    display: flex; align-items: center; justify-content: center;
+    position: fixed; right: 16px;
+    bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));
+    width: 54px; height: 54px; border-radius: 50%; z-index: 25;
+    background: var(--accent); color: #fff; border: none; font-size: 19px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35); cursor: pointer;
+  }
+  .crumbs .crumbs-help { width: 30px; height: 30px; font-size: 14px; }
+}
 
 /* Mobile touch targets — MUST STAY LAST IN THIS FILE. These re-assert the
    44px/16px rules from the mobile-header media block above, which are

@@ -61,8 +61,9 @@ test.describe("AeroMRO iPhone experience", () => {
     await page.locator(".tabbar").getByRole("button", { name: /Defects/ }).click();
     await expect(page.locator("main h1")).toHaveText("Defects");
 
-    // First aircraft registration link in the register table.
-    const link = page.locator("table .entity-link").first();
+    // On mobile the register renders as cards (.mobile-only), not the table —
+    // tap the first aircraft registration link in the card list.
+    const link = page.locator(".mobile-only .entity-link").first();
     await expect(link).toBeVisible();
     await link.click();
 
