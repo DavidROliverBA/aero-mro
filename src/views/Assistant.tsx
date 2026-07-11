@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Store, Tab } from "../App";
 import {
   agentTurn,
@@ -35,6 +35,8 @@ export default function Assistant({
   onNeedKey,
   setTab,
   account,
+  seed,
+  onSeedConsumed,
 }: {
   store: Store;
   reload: () => Promise<void>;
@@ -42,6 +44,8 @@ export default function Assistant({
   onNeedKey: () => void;
   setTab: (t: Tab) => void;
   account: string;
+  seed?: string | null;
+  onSeedConsumed?: () => void;
 }) {
   const [items, setItems] = useState<ChatItem[]>([]);
   const [input, setInput] = useState("");
@@ -62,6 +66,17 @@ export default function Assistant({
   function push(...next: ChatItem[]) {
     setItems((cur) => [...cur, ...next]);
   }
+
+  // A query handed over from the command palette: send it straight away if a
+  // key is set, otherwise pre-fill the input so nothing is lost.
+  useEffect(() => {
+    if (seed) {
+      onSeedConsumed?.();
+      if (keySet) void send(seed);
+      else setInput(seed);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function runTurn() {
     setBusy(true);

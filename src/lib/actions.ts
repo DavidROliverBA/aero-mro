@@ -4,6 +4,7 @@
 
 import { supabase } from "./supabase";
 import type { ProposedAction } from "./ai";
+import type { Engineer, TaskCard } from "./types";
 import type { Store } from "../App";
 
 // Short refs keep the snapshot small and give the model stable handles.
@@ -81,6 +82,30 @@ export function buildSnapshot(store: Store): string {
 
 function str(v: unknown): string {
   return typeof v === "string" ? v : String(v ?? "");
+}
+
+// Sign a task card — completion or independent inspection — as a named
+// engineer. Shared by the Work Orders and My Work views so the 145.A.45/48
+// write path exists exactly once.
+export async function signCard(
+  card: TaskCard,
+  eng: Engineer,
+  kind: "completion" | "inspection",
+  woNumber: string,
+): Promise<void> {
+  const patch =
+    kind === "completion"
+      ? { status: "complete", completed_by: eng.id, completed_at: new Date().toISOString() }
+      : { status: "inspected", inspected_by: eng.id, inspected_at: new Date().toISOString() };
+  const { error } = await supabase.from("task_cards").update(patch).eq("id", card.id);
+  if (error) throw error;
+  const { error: e2 } = await supabase.from("audit_log").insert({
+    entity: "task_cards",
+    action: kind === "completion" ? "Task signed off" : "Independent inspection signed",
+    actor: `${eng.full_name} (${eng.part66_licence_no})`,
+    detail: `${woNumber} card ${card.sequence}: ${card.description}`,
+  });
+  if (e2) throw e2;
 }
 
 // Rolls sector hours/cycles onto the airframe. Reads the aircraft fresh from

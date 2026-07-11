@@ -24,7 +24,8 @@ AI at *assistance* level. So AeroMRO's thesis is simple:
 
 | Module | Regulatory basis | In the app |
 |--------|------------------|-----------|
-| **Dashboard** | — | Fleet posture + a "needs attention" list aggregating every compliance clock in the system |
+| **Dashboard** | — | Fleet posture, a "needs attention" list aggregating every compliance clock, and a one-tap **AI daily briefing** for the duty manager |
+| **My Work** | Part-66 | The engineer's workbench: your cards, inspections waiting on you, your week's roster, licence countdown — sign off without leaving the page |
 | **Fleet** | Part-CAMO | Register, hours/cycles, status, next programme due per tail |
 | **Tech Log** | 145.A.45 / e-tech-log | Per-sector flight records; closing a sector rolls FH/FC onto the airframe |
 | **Defects** | MEL / MMEL | Defect register with live **MEL rectification clocks** (Cat A/B/C/D) + AI triage |
@@ -56,6 +57,14 @@ AI at *assistance* level. So AeroMRO's thesis is simple:
 
 See [`docs/ai-design.md`](docs/ai-design.md) for the UI-vs-AI decision
 framework and [`ROADMAP.md`](ROADMAP.md) for the research behind it.
+
+### Fast to drive
+
+**⌘K / Ctrl+K** opens a command palette that searches everything — aircraft,
+defects, work orders, parts, tools, staff, ADs, audits — and any query can be
+handed straight to the AI assistant. See [`docs/path-to-v1.md`](docs/path-to-v1.md)
+for the plan (phases, integrations, effort) to take this from demonstration
+to production.
 
 ### Designed for the hangar floor
 

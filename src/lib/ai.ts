@@ -142,6 +142,24 @@ export async function draftCrsStatement(
 }
 
 // ---------------------------------------------------------------------------
+// 2b. Manager daily briefing — one-shot narrative over the live snapshot.
+// ---------------------------------------------------------------------------
+export async function dailyBrief(snapshot: string): Promise<string> {
+  const r = await callClaude({
+    model: MODEL,
+    max_tokens: 700,
+    system:
+      "You are the duty manager's morning briefing writer for a UK Part-145/CAMO organisation. " +
+      "From the data snapshot, write a briefing of at most 8 short bullet lines, most urgent first: " +
+      "AOG aircraft and what unblocks them, MEL clocks near breach, overdue/imminent checks and ADs, " +
+      "certifying-coverage gaps, stores/tooling issues, then one line of good news if any. " +
+      "British English. Plain text bullets (• ), no markdown headings. Never invent data.",
+    messages: [{ role: "user", content: `Data snapshot (JSON):\n${snapshot}\n\nWrite today's briefing.` }],
+  });
+  return textOf(r).trim();
+}
+
+// ---------------------------------------------------------------------------
 // 3. Agentic assistant — natural-language command over the whole system.
 //
 // Design (see docs/ai-design.md): the model sees a snapshot of live data and a
@@ -177,7 +195,7 @@ export const AGENT_TOOLS: AgentToolDef[] = [
         tab: {
           type: "string",
           enum: [
-            "dashboard", "fleet", "techlog", "defects", "workorders", "planning",
+            "dashboard", "mywork", "fleet", "techlog", "defects", "workorders", "planning",
             "parts", "tooling", "directives", "reliability", "quality", "engineers",
             "workforce", "assistant",
           ],

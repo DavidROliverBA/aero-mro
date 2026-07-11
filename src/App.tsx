@@ -22,7 +22,9 @@ import type {
   WorkOrder,
 } from "./lib/types";
 import { coverageGaps, daysUntil, mpDue, toolCheck } from "./lib/compliance";
+import CommandPalette from "./components/CommandPalette";
 import Dashboard from "./views/Dashboard";
+import MyWork from "./views/MyWork";
 import Fleet from "./views/Fleet";
 import TechLog from "./views/TechLog";
 import Defects from "./views/Defects";
@@ -77,6 +79,7 @@ const EMPTY: Store = {
 
 export type Tab =
   | "dashboard"
+  | "mywork"
   | "fleet"
   | "techlog"
   | "defects"
@@ -107,6 +110,20 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [askSeed, setAskSeed] = useState<string | null>(null);
+
+  // ⌘K / Ctrl+K opens the command palette from anywhere.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   async function reload() {
     setLoading(true);
@@ -212,6 +229,7 @@ export default function App() {
       label: "Operations",
       items: [
         { id: "dashboard", label: "Dashboard", icon: "▤" },
+        { id: "mywork", label: "My Work", icon: "✅" },
         { id: "fleet", label: "Fleet", icon: "✈", badge: aogCount || undefined },
         { id: "techlog", label: "Tech Log", icon: "🛫" },
         { id: "defects", label: "Defects", icon: "⚠", badge: openDefects || undefined },
@@ -252,7 +270,7 @@ export default function App() {
     },
   ];
   const ALL_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
-  const PRIMARY: Tab[] = ["dashboard", "techlog", "defects", "workorders"];
+  const PRIMARY: Tab[] = ["dashboard", "mywork", "defects", "workorders"];
   const primaryItems = PRIMARY.map((id) => ALL_ITEMS.find((n) => n.id === id)!);
   const moreBadge = ALL_ITEMS.filter((n) => !PRIMARY.includes(n.id))
     .reduce((s, n) => s + (n.badge ?? 0), 0);
@@ -285,7 +303,8 @@ export default function App() {
 
   const view = (
     <>
-      {tab === "dashboard" && <Dashboard store={store} setTab={go} />}
+      {tab === "dashboard" && <Dashboard store={store} setTab={go} keySet={keySet} onNeedKey={handleKey} />}
+      {tab === "mywork" && <MyWork store={store} reload={reload} />}
       {tab === "fleet" && <Fleet store={store} />}
       {tab === "techlog" && <TechLog store={store} reload={reload} />}
       {tab === "defects" && <Defects store={store} reload={reload} keySet={keySet} onNeedKey={handleKey} />}
@@ -299,7 +318,16 @@ export default function App() {
       {tab === "engineers" && <Engineers store={store} />}
       {tab === "workforce" && <Workforce store={store} reload={reload} />}
       {tab === "assistant" && (
-        <Assistant store={store} reload={reload} keySet={keySet} onNeedKey={handleKey} setTab={go} account={account} />
+        <Assistant
+          store={store}
+          reload={reload}
+          keySet={keySet}
+          onNeedKey={handleKey}
+          setTab={go}
+          account={account}
+          seed={askSeed}
+          onSeedConsumed={() => setAskSeed(null)}
+        />
       )}
     </>
   );
@@ -314,6 +342,13 @@ export default function App() {
           AeroMRO
           <small>Part-145 / CAMO · UK CAA + EASA</small>
         </div>
+        <button
+          className="btn ghost"
+          style={{ width: "100%", marginBottom: 12, textAlign: "left" }}
+          onClick={() => setPaletteOpen(true)}
+        >
+          🔎 Search everything <span className="muted" style={{ float: "right" }}>⌘K</span>
+        </button>
         <nav className="nav" aria-label="Main navigation">
           {NAV_GROUPS.map((g) => (
             <div className="nav-group" key={g.label}>
@@ -349,9 +384,14 @@ export default function App() {
       {/* Mobile header */}
       <header className="mobile-header">
         <div className="brand">AeroMRO</div>
-        <button className="btn ghost" onClick={() => go("assistant")} aria-label="Open AI assistant">
-          ✨ Ask AI
-        </button>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn ghost" onClick={() => setPaletteOpen(true)} aria-label="Search everything">
+            🔎
+          </button>
+          <button className="btn ghost" onClick={() => go("assistant")} aria-label="Open AI assistant">
+            ✨ Ask AI
+          </button>
+        </div>
       </header>
 
       <main className="main" id="main">
@@ -387,6 +427,17 @@ export default function App() {
           {moreBadge ? <span className="badge">{moreBadge}</span> : null}
         </button>
       </nav>
+
+      <CommandPalette
+        store={store}
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        go={go}
+        onAsk={(q) => {
+          setAskSeed(q);
+          go("assistant");
+        }}
+      />
 
       {/* Mobile "More" sheet */}
       {moreOpen && (

@@ -1,4 +1,7 @@
+import { useState } from "react";
 import type { Store, Tab } from "../App";
+import { dailyBrief } from "../lib/ai";
+import { buildSnapshot } from "../lib/actions";
 import { EmptyState, Pill, StatCard, statusPill } from "../components/ui";
 import {
   adAlert,
@@ -24,10 +27,28 @@ const TONE_RANK: Record<Tone, number> = { danger: 0, warn: 1, ok: 2 };
 export default function Dashboard({
   store,
   setTab,
+  keySet,
+  onNeedKey,
 }: {
   store: Store;
   setTab: (t: Tab) => void;
+  keySet: boolean;
+  onNeedKey: () => void;
 }) {
+  const [brief, setBrief] = useState<string | null>(null);
+  const [briefing, setBriefing] = useState(false);
+
+  async function runBrief() {
+    if (!keySet) return onNeedKey();
+    setBriefing(true);
+    try {
+      setBrief(await dailyBrief(buildSnapshot(store)));
+    } catch (e) {
+      setBrief(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBriefing(false);
+    }
+  }
   const aog = store.aircraft.filter((a) => a.status === "aog");
   const openDefects = store.defects.filter((d) => d.status !== "closed");
   const melBreached = store.defects.filter((d) => {
@@ -168,10 +189,24 @@ export default function Dashboard({
 
   return (
     <>
-      <h1>Fleet Airworthiness Dashboard</h1>
-      <p className="subtitle">
-        Albion Atlantic Airways · continuing airworthiness status at a glance
-      </p>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h1>Fleet Airworthiness Dashboard</h1>
+          <p className="subtitle">
+            Albion Atlantic Airways · continuing airworthiness status at a glance
+          </p>
+        </div>
+        <button className="btn ghost" onClick={() => void runBrief()} disabled={briefing}>
+          {briefing ? "Briefing…" : "✨ Daily briefing"}
+        </button>
+      </div>
+
+      {brief && (
+        <div className="ai-box" style={{ marginTop: 0, marginBottom: 18 }}>
+          <span className="ai-tag">✨ Duty manager briefing — {new Date().toLocaleDateString("en-GB")}</span>
+          <div className="ai-out">{brief}</div>
+        </div>
+      )}
 
       <div className="grid">
         <StatCard label="Aircraft in fleet" value={store.aircraft.length} />
