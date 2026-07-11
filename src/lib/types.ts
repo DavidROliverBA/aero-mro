@@ -57,6 +57,8 @@ export interface Part {
   shelf_expiry: string | null;
   fitted_to: string | null;
   ata_chapter: string | null;
+  location: string | null;
+  quantity: number;
 }
 
 export interface WorkOrder {
@@ -81,6 +83,10 @@ export interface TaskCard {
   assigned_engineer: string | null;
   est_hours: number;
   requires_inspection: boolean;
+  completed_by: string | null;
+  completed_at: string | null;
+  inspected_by: string | null;
+  inspected_at: string | null;
 }
 
 export interface AirworthinessDirective {
@@ -103,4 +109,89 @@ export interface AdCompliance {
   complied_at: string | null;
   next_due: string | null;
   work_order_id: string | null;
+}
+
+export interface Flight {
+  id: string;
+  aircraft_id: string;
+  flight_no: string;
+  flight_date: string;
+  dep: string;
+  arr: string;
+  block_hours: number;
+  cycles: number;
+  captain: string;
+  fuel_uplift_kg: number | null;
+  oil_uplift_qt: number | null;
+  status: "open" | "closed";
+  remarks: string | null;
+}
+
+export interface Tool {
+  id: string;
+  tool_no: string;
+  description: string;
+  location: string;
+  last_calibrated: string | null;
+  calibration_due: string | null;
+  condition: "serviceable" | "quarantine";
+  assigned_to: string | null;
+}
+
+export interface MpTask {
+  id: string;
+  task_code: string;
+  applies_to_type: string;
+  title: string;
+  ata_chapter: string | null;
+  interval_fh: number | null;
+  interval_fc: number | null;
+  interval_days: number | null;
+  source: string;
+}
+
+export interface MpCompliance {
+  id: string;
+  mp_task_id: string;
+  aircraft_id: string;
+  last_done_date: string | null;
+  last_done_fh: number | null;
+  last_done_fc: number | null;
+  work_order_id: string | null;
+}
+
+export interface LlpComponent {
+  id: string;
+  aircraft_id: string;
+  part_number: string;
+  serial_number: string;
+  description: string;
+  position: string | null;
+  limit_fc: number | null;
+  limit_fh: number | null;
+  accumulated_fc: number;
+  accumulated_fh: number;
+  installed_on: string | null;
+}
+
+export interface Audit {
+  id: string;
+  audit_ref: string;
+  area: string;
+  regulation_ref: string | null;
+  audit_date: string;
+  auditor: string;
+  status: "planned" | "in_progress" | "closed";
+}
+
+export interface AuditFinding {
+  id: string;
+  audit_id: string;
+  level: "level_1" | "level_2" | "observation";
+  description: string;
+  corrective_action: string | null;
+  owner: string | null;
+  due_date: string | null;
+  status: "open" | "closed";
+  closed_at: string | null;
 }

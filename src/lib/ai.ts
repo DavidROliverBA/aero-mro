@@ -142,27 +142,186 @@ export async function draftCrsStatement(
 }
 
 // ---------------------------------------------------------------------------
-// 3. Natural-language assistant over a snapshot of live fleet data.
+// 3. Agentic assistant — natural-language command over the whole system.
+//
+// Design (see docs/ai-design.md): the model sees a snapshot of live data and a
+// set of ACTION TOOLS. Read-and-answer needs no tools. Any write it wants to
+// make surfaces in the UI as a pending action card that a human must confirm
+// before it executes — the model never mutates data itself, and regulatory
+// acts (sign-off, CRS, quarantine, deferral commitment) have no tool at all.
 // ---------------------------------------------------------------------------
-export async function askAssistant(
-  question: string,
-  context: string,
-): Promise<string> {
+
+export interface AgentToolDef {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
+
+const obj = (
+  props: Record<string, unknown>,
+  required: string[],
+): Record<string, unknown> => ({
+  type: "object",
+  additionalProperties: false,
+  properties: props,
+  required,
+});
+
+export const AGENT_TOOLS: AgentToolDef[] = [
+  {
+    name: "navigate",
+    description:
+      "Open a view in the app for the user. Safe, executes immediately without confirmation.",
+    input_schema: obj(
+      {
+        tab: {
+          type: "string",
+          enum: [
+            "dashboard", "fleet", "techlog", "defects", "workorders", "planning",
+            "parts", "tooling", "directives", "reliability", "quality", "engineers", "assistant",
+          ],
+        },
+      },
+      ["tab"],
+    ),
+  },
+  {
+    name: "create_defect",
+    description:
+      "Raise a new defect against an aircraft. Requires human confirmation before it is written.",
+    input_schema: obj(
+      {
+        aircraft_reg: { type: "string", description: "e.g. G-ALBA" },
+        description: { type: "string" },
+        ata_chapter: { type: "string", description: "2-digit ATA chapter" },
+        severity: { type: "string", enum: ["minor", "major", "critical"] },
+        raised_by: { type: "string", description: "Who reported it" },
+      },
+      ["aircraft_reg", "description", "severity", "raised_by"],
+    ),
+  },
+  {
+    name: "create_work_order",
+    description:
+      "Open a new work order on an aircraft, optionally linked to an existing defect (by its ref shown in the snapshot). Requires human confirmation.",
+    input_schema: obj(
+      {
+        aircraft_reg: { type: "string" },
+        title: { type: "string" },
+        wo_type: { type: "string", enum: ["scheduled", "unscheduled", "ad_sb", "mod"] },
+        source_defect_ref: { type: "string", description: "8-char defect ref from the snapshot, if raised from a defect" },
+      },
+      ["aircraft_reg", "title", "wo_type"],
+    ),
+  },
+  {
+    name: "add_task_card",
+    description: "Append a task card to an existing work order (by WO number). Requires human confirmation.",
+    input_schema: obj(
+      {
+        wo_number: { type: "string", description: "e.g. WO-2026-0002" },
+        description: { type: "string" },
+        ata_chapter: { type: "string" },
+        est_hours: { type: "number" },
+        requires_inspection: { type: "boolean", description: "true if the task is flight-safety critical and needs independent inspection" },
+      },
+      ["wo_number", "description"],
+    ),
+  },
+  {
+    name: "record_flight",
+    description:
+      "Record a tech-log flight sector. Closing a sector rolls its hours/cycles onto the airframe totals. Requires human confirmation.",
+    input_schema: obj(
+      {
+        aircraft_reg: { type: "string" },
+        flight_no: { type: "string" },
+        flight_date: { type: "string", description: "YYYY-MM-DD" },
+        dep: { type: "string" },
+        arr: { type: "string" },
+        block_hours: { type: "number" },
+        captain: { type: "string" },
+        remarks: { type: "string" },
+      },
+      ["aircraft_reg", "flight_no", "flight_date", "dep", "arr", "block_hours", "captain"],
+    ),
+  },
+  {
+    name: "update_aircraft_status",
+    description: "Change an aircraft's operational status. Requires human confirmation.",
+    input_schema: obj(
+      {
+        aircraft_reg: { type: "string" },
+        status: { type: "string", enum: ["in_service", "scheduled_maintenance", "aog", "stored"] },
+        reason: { type: "string" },
+      },
+      ["aircraft_reg", "status", "reason"],
+    ),
+  },
+];
+
+// Tools that are pure UI and execute without a confirmation card.
+export const AUTO_TOOLS = new Set(["navigate"]);
+
+export interface ContentBlock {
+  type: string;
+  text?: string;
+  id?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+  tool_use_id?: string;
+  content?: string;
+  is_error?: boolean;
+}
+export interface AgentMessage {
+  role: "user" | "assistant";
+  content: string | ContentBlock[];
+}
+
+export interface ProposedAction {
+  id: string; // tool_use id — echoed back in the tool_result
+  tool: string;
+  input: Record<string, unknown>;
+}
+
+export interface AgentTurn {
+  text: string;
+  assistantBlocks: ContentBlock[]; // append verbatim to history before results
+  actions: ProposedAction[];
+  stopReason: string;
+}
+
+const AGENT_SYSTEM =
+  "You are the AeroMRO assistant for 'Albion Atlantic Airways', a UK CAA/EASA Part-145 + Part-CAMO " +
+  "maintenance organisation. You can answer anything from the live data snapshot, and you can PROPOSE " +
+  "actions using the tools provided — every write is shown to the user as a pending action card they " +
+  "must confirm, so state clearly what you propose and why. Rules: (1) never invent data — if it is " +
+  "not in the snapshot, say so; (2) regulatory acts (task sign-off, independent inspection, CRS issue, " +
+  "MEL deferral commitment, quarantine) are deliberately NOT available as tools — direct the user to " +
+  "the relevant view instead and use navigate to take them there; (3) flag any compliance risk you " +
+  "notice (expired licences, MEL clocks, overdue ADs/checks, calibration, shelf-life, LLP limits); " +
+  "(4) British English, concise; (5) refs in the snapshot like 'ref' fields are 8-char ids — use them " +
+  "in tool inputs where a ref is required.";
+
+export async function agentTurn(
+  history: AgentMessage[],
+  snapshot: string,
+): Promise<AgentTurn> {
   const r = await callClaude({
     model: MODEL,
-    max_tokens: 1500,
-    thinking: { type: "adaptive" },
-    system:
-      "You are the AeroMRO assistant for a UK CAA/EASA Part-145 maintenance organisation. " +
-      "Answer questions about the fleet using ONLY the data snapshot provided. If the answer is not " +
-      "in the data, say so. Be concise and use British English. Flag any airworthiness or compliance " +
-      "risk you notice (expired licences, breached MEL clocks, overdue ADs).",
-    messages: [
-      {
-        role: "user",
-        content: `Fleet data snapshot (JSON):\n${context}\n\nQuestion: ${question}`,
-      },
-    ],
+    max_tokens: 2000,
+    system: AGENT_SYSTEM + "\n\nLive data snapshot (JSON):\n" + snapshot,
+    tools: AGENT_TOOLS,
+    messages: history,
   });
-  return textOf(r).trim();
+  const blocks = r.content as ContentBlock[];
+  const actions: ProposedAction[] = blocks
+    .filter((b) => b.type === "tool_use")
+    .map((b) => ({ id: b.id!, tool: b.name!, input: (b.input ?? {}) as Record<string, unknown> }));
+  return {
+    text: textOf(r).trim(),
+    assistantBlocks: blocks,
+    actions,
+    stopReason: r.stop_reason,
+  };
 }

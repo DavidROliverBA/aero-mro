@@ -1,8 +1,43 @@
 import type { Store } from "../App";
 import { statusPill, Pill } from "../components/ui";
-import { daysUntil } from "../lib/compliance";
+import { mpDue, type DueItem, type Tone } from "../lib/compliance";
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const TONE_RANK: Record<Tone, number> = { danger: 0, warn: 1, ok: 2 };
 
 export default function Fleet({ store }: { store: Store }) {
+  function sectorsLast7Days(aircraftId: string): number {
+    const cutoff = Date.now() - SEVEN_DAYS_MS;
+    return store.flights.filter(
+      (f) => f.aircraft_id === aircraftId && new Date(f.flight_date).getTime() >= cutoff,
+    ).length;
+  }
+
+  function worstDue(aircraftId: string): DueItem | null {
+    const items = store.mpCompliance
+      .filter((c) => c.aircraft_id === aircraftId)
+      .map((c) => {
+        const task = store.mpTasks.find((t) => t.id === c.mp_task_id);
+        const ac = store.aircraft.find((a) => a.id === aircraftId);
+        return task && ac ? mpDue(task, c, ac) : null;
+      })
+      .filter((x): x is DueItem => x !== null);
+    if (items.length === 0) return null;
+    items.sort((a, b) => {
+      if (TONE_RANK[a.tone] !== TONE_RANK[b.tone]) return TONE_RANK[a.tone] - TONE_RANK[b.tone];
+      const marginsA = [a.remainingDays, a.remainingFh, a.remainingFc].filter(
+        (v): v is number => v !== null,
+      );
+      const marginsB = [b.remainingDays, b.remainingFh, b.remainingFc].filter(
+        (v): v is number => v !== null,
+      );
+      const minA = marginsA.length ? Math.min(...marginsA) : Infinity;
+      const minB = marginsB.length ? Math.min(...marginsB) : Infinity;
+      return minA - minB;
+    });
+    return items[0];
+  }
+
   return (
     <>
       <h1>Fleet</h1>
@@ -15,32 +50,41 @@ export default function Fleet({ store }: { store: Store }) {
               <th>Type</th>
               <th>MSN</th>
               <th>Base</th>
-              <th>Hours</th>
-              <th>Cycles</th>
+              <th>FH</th>
+              <th>FC</th>
               <th>Status</th>
-              <th>Next check</th>
+              <th>Sectors (7d)</th>
+              <th>Next programme due</th>
               <th>Open defects</th>
             </tr>
           </thead>
           <tbody>
             {store.aircraft.map((a) => {
               const defects = store.defects.filter((d) => d.aircraft_id === a.id && d.status !== "closed");
-              const due = daysUntil(a.next_check_due);
+              const due = worstDue(a.id);
               return (
                 <tr key={a.id}>
                   <td><strong>{a.registration}</strong></td>
                   <td>{a.type_designator}</td>
                   <td className="muted">{a.msn}</td>
                   <td>{a.base}</td>
-                  <td>{a.total_hours.toLocaleString()}</td>
-                  <td>{a.total_cycles.toLocaleString()}</td>
+                  <td>{Number(a.total_hours).toLocaleString("en-GB")}</td>
+                  <td>{a.total_cycles.toLocaleString("en-GB")}</td>
                   <td>{statusPill(a.status)}</td>
+                  <td>{sectorsLast7Days(a.id)}</td>
                   <td>
-                    {a.next_check_type}{" "}
-                    {due !== null && (
-                      <Pill tone={due < 0 ? "danger" : due <= 14 ? "warn" : "muted"}>
-                        {due < 0 ? `${Math.abs(due)}d overdue` : `${due}d`}
-                      </Pill>
+                    {due ? (
+                      <>
+                        {due.task.title} <Pill tone={due.tone}>{due.limitingLabel}</Pill>
+                      </>
+                    ) : a.next_check_type && a.next_check_due ? (
+                      // No programme rows tracked yet — fall back to the
+                      // aircraft's own next-check fields rather than showing nothing.
+                      <span className="muted">
+                        {a.next_check_type} · {new Date(a.next_check_due + "T00:00:00").toLocaleDateString("en-GB")}
+                      </span>
+                    ) : (
+                      <span className="muted">—</span>
                     )}
                   </td>
                   <td>

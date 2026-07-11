@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { Store } from "../App";
 import { supabase } from "../lib/supabase";
 import { draftCrsStatement } from "../lib/ai";
-import { checkCertifyingPrivilege } from "../lib/compliance";
+import { checkCertifyingPrivilege, crsBlockers } from "../lib/compliance";
 import { Pill } from "../components/ui";
 
 const WO_TONE: Record<string, "ok" | "warn" | "danger" | "muted" | "info"> = {
@@ -36,10 +36,63 @@ export default function WorkOrders({
   const [statement, setStatement] = useState("");
   const [busy, setBusy] = useState<"draft" | "issue" | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [actingEngId, setActingEngId] = useState("");
+  const [signingCard, setSigningCard] = useState<string | null>(null);
 
   const eng = store.engineers.find((e) => e.id === engId);
   const licence = eng && ac ? checkCertifyingPrivilege(eng, ac.type_designator) : null;
-  const allTasksDone = tasks.length > 0 && tasks.every((t) => t.status === "complete" || t.status === "inspected");
+  const actingEng = store.engineers.find((e) => e.id === actingEngId);
+  const blockers = crsBlockers(tasks);
+
+  async function signTask(card: (typeof tasks)[number]) {
+    if (!actingEng || !wo) return;
+    setSigningCard(card.id);
+    setMsg(null);
+    try {
+      const now = new Date().toISOString();
+      const { error: e1 } = await supabase
+        .from("task_cards")
+        .update({ status: "complete", completed_by: actingEng.id, completed_at: now })
+        .eq("id", card.id);
+      if (e1) throw e1;
+      await supabase.from("audit_log").insert({
+        entity: "task_cards",
+        action: "Task signed off",
+        actor: `${actingEng.full_name} (${actingEng.part66_licence_no})`,
+        detail: `${wo.wo_number} card ${card.sequence}: ${card.description}`,
+      });
+      await reload();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSigningCard(null);
+    }
+  }
+
+  async function signInspection(card: (typeof tasks)[number]) {
+    if (!actingEng || !wo) return;
+    setSigningCard(card.id);
+    setMsg(null);
+    try {
+      const now = new Date().toISOString();
+      const { error: e1 } = await supabase
+        .from("task_cards")
+        .update({ status: "inspected", inspected_by: actingEng.id, inspected_at: now })
+        .eq("id", card.id);
+      if (e1) throw e1;
+      await supabase.from("audit_log").insert({
+        entity: "task_cards",
+        action: "Independent inspection signed",
+        actor: `${actingEng.full_name} (${actingEng.part66_licence_no})`,
+        detail: `${wo.wo_number} card ${card.sequence}: ${card.description}`,
+      });
+      await reload();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSigningCard(null);
+    }
+  }
 
   async function draft() {
     if (!keySet) return onNeedKey();
@@ -57,7 +110,13 @@ export default function WorkOrders({
   }
 
   async function issueCrs() {
-    if (!wo || !eng || !licence?.valid) return;
+    if (!wo || !eng || !licence?.valid || busy) return;
+    // Re-check the sign-off gates in the mutator itself, not just the button's
+    // disabled prop — a stale render or double-click must not release the WO.
+    if (crsBlockers(tasks).length > 0) {
+      setMsg("Cannot issue CRS — task cards remain unsigned or awaiting independent inspection.");
+      return;
+    }
     setBusy("issue");
     setMsg(null);
     try {
@@ -93,7 +152,7 @@ export default function WorkOrders({
       <h1>Work Orders</h1>
       <p className="subtitle">Maintenance work packages, task cards, and release to service (CRS)</p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20 }}>
+      <div className="split">
         <div>
           {store.workOrders.map((w) => {
             const acr = store.aircraft.find((a) => a.id === w.aircraft_id);
@@ -139,6 +198,17 @@ export default function WorkOrders({
               </div>
 
               <h2>Task cards</h2>
+
+              <label htmlFor="acting-engineer">Acting as</label>
+              <select id="acting-engineer" value={actingEngId} onChange={(e) => setActingEngId(e.target.value)}>
+                <option value="">— select engineer —</option>
+                {store.engineers.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.full_name} · {e.part66_licence_no}
+                  </option>
+                ))}
+              </select>
+
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -149,11 +219,70 @@ export default function WorkOrders({
                       <th>Assigned</th>
                       <th>Est h</th>
                       <th>Status</th>
+                      <th>Sign-off</th>
                     </tr>
                   </thead>
                   <tbody>
                     {tasks.map((t) => {
                       const asg = store.engineers.find((e) => e.id === t.assigned_engineer);
+                      const completedBy = store.engineers.find((e) => e.id === t.completed_by);
+                      const inspectedBy = store.engineers.find((e) => e.id === t.inspected_by);
+                      const isBusy = signingCard === t.id;
+
+                      let signOffCell: ReactNode;
+                      if (t.status !== "complete" && t.status !== "inspected") {
+                        const disabled = isBusy || !actingEng;
+                        signOffCell = (
+                          <>
+                            <span className="muted">unsigned</span>{" "}
+                            <button
+                              className="btn ghost small"
+                              disabled={disabled}
+                              title={!actingEng ? "Select an acting engineer above first" : ""}
+                              onClick={() => signTask(t)}
+                            >
+                              {isBusy ? "Signing…" : "Sign task"}
+                            </button>
+                          </>
+                        );
+                      } else if (t.status === "complete") {
+                        const canInspect = t.requires_inspection;
+                        let inspectDisabledReason = "";
+                        if (!actingEng) inspectDisabledReason = "Select an acting engineer above first";
+                        else if (actingEng.id === t.completed_by)
+                          inspectDisabledReason = "Independent inspection — must be a different engineer (145.A.48)";
+                        else if (ac) {
+                          const priv = checkCertifyingPrivilege(actingEng, ac.type_designator);
+                          if (!priv.valid) inspectDisabledReason = priv.reasons[0] ?? "Not authorised to certify";
+                        }
+                        signOffCell = (
+                          <>
+                            <span className="muted">
+                              ✓ {completedBy?.full_name ?? "—"} {t.completed_at ? new Date(t.completed_at).toLocaleDateString("en-GB") : ""}
+                            </span>
+                            {canInspect && (
+                              <>
+                                {" "}
+                                <button
+                                  className="btn ghost small"
+                                  disabled={isBusy || !!inspectDisabledReason}
+                                  title={inspectDisabledReason}
+                                  onClick={() => signInspection(t)}
+                                >
+                                  {isBusy ? "Signing…" : "Sign inspection"}
+                                </button>
+                              </>
+                            )}
+                          </>
+                        );
+                      } else {
+                        signOffCell = (
+                          <span className="muted">
+                            ✓✓ insp. {inspectedBy?.full_name ?? "—"} {t.inspected_at ? new Date(t.inspected_at).toLocaleDateString("en-GB") : ""}
+                          </span>
+                        );
+                      }
+
                       return (
                         <tr key={t.id}>
                           <td>{t.sequence}</td>
@@ -174,6 +303,7 @@ export default function WorkOrders({
                               {t.status}
                             </Pill>
                           </td>
+                          <td>{signOffCell}</td>
                         </tr>
                       );
                     })}
@@ -188,9 +318,11 @@ export default function WorkOrders({
                     <span className="ai-tag">✨ AI-drafted statement</span>
                   </div>
 
-                  {!allTasksDone && (
+                  {blockers.length > 0 && (
                     <div className="banner" style={{ marginTop: 10 }}>
-                      Not all task cards are complete/inspected. CRS should only be issued once work is finished.
+                      {blockers.map((b, i) => (
+                        <div key={i}>{b}</div>
+                      ))}
                     </div>
                   )}
 
@@ -244,8 +376,14 @@ export default function WorkOrders({
                     <button
                       className="btn"
                       onClick={issueCrs}
-                      disabled={busy !== null || !licence?.valid}
-                      title={!licence?.valid ? "Certifying engineer must hold a valid licence + type rating" : ""}
+                      disabled={busy !== null || !licence?.valid || blockers.length > 0}
+                      title={
+                        !licence?.valid
+                          ? "Certifying engineer must hold a valid licence + type rating"
+                          : blockers.length > 0
+                            ? "All task cards must be signed off (and independently inspected where required) before CRS can be issued"
+                            : ""
+                      }
                     >
                       {busy === "issue" ? "Issuing…" : "Issue CRS & close work order"}
                     </button>

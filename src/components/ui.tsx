@@ -32,3 +32,28 @@ export function statusPill(status: string) {
   const tone = AC_TONE[status] ?? "info";
   return <Pill tone={tone}>{status.replace(/_/g, " ")}</Pill>;
 }
+
+// Horizontal life-consumed bar, e.g. LLP cycles used.
+export function LifeBar({ pct, tone }: { pct: number; tone: "ok" | "warn" | "danger" }) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  return (
+    <div
+      className={`bar ${tone}`}
+      role="progressbar"
+      aria-valuenow={Math.round(clamped)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={`${clamped.toFixed(1)}% of life limit consumed`}
+    >
+      <span style={{ width: `${clamped}%` }} />
+    </div>
+  );
+}
+
+export function EmptyState({ children }: { children: ReactNode }) {
+  return (
+    <p className="muted" style={{ padding: "24px 4px", textAlign: "center" }}>
+      {children}
+    </p>
+  );
+}
