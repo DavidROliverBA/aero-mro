@@ -31,7 +31,7 @@ export default function Dashboard({
   onNeedKey,
 }: {
   store: Store;
-  setTab: (t: Tab) => void;
+  setTab: (t: Tab, focusId?: string) => void;
   keySet: boolean;
   onNeedKey: () => void;
 }) {
@@ -209,35 +209,50 @@ export default function Dashboard({
       )}
 
       <div className="grid">
-        <StatCard label="Aircraft in fleet" value={store.aircraft.length} />
-        <StatCard label="AOG" value={aog.length} tone={aog.length ? "danger" : "ok"} />
-        <StatCard label="Open defects" value={openDefects.length} tone={openDefects.length ? "warn" : "ok"} />
-        <StatCard label="Open work orders" value={openWo.length} />
-        <StatCard label="Open tech-log sectors" value={openSectors.length} />
+        <StatCard label="Aircraft in fleet" value={store.aircraft.length} onClick={() => setTab("fleet")} />
+        <StatCard
+          label="AOG"
+          value={aog.length}
+          tone={aog.length ? "danger" : "ok"}
+          onClick={() => setTab("fleet", aog[0]?.id)}
+        />
+        <StatCard
+          label="Open defects"
+          value={openDefects.length}
+          tone={openDefects.length ? "warn" : "ok"}
+          onClick={() => setTab("defects")}
+        />
+        <StatCard label="Open work orders" value={openWo.length} onClick={() => setTab("workorders", openWo[0]?.id)} />
+        <StatCard label="Open tech-log sectors" value={openSectors.length} onClick={() => setTab("techlog")} />
         <StatCard
           label="Overdue programme checks"
           value={overdueChecks.length}
           tone={overdueChecks.length ? "danger" : "ok"}
+          onClick={() => setTab("planning")}
         />
         <StatCard
           label="Tooling issues"
           value={toolIssues.length}
           tone={toolIssues.length ? "danger" : "ok"}
+          onClick={() => setTab("tooling")}
         />
         <StatCard
           label="Open audit findings"
           value={openFindings.length}
           tone={openFindings.length ? "warn" : "ok"}
+          onClick={() => setTab("quality")}
         />
         <StatCard
           label="MEL clocks breached"
           value={melBreached.length}
           tone={melBreached.length ? "danger" : "ok"}
+          onClick={() => setTab("defects", melBreached[0]?.id)}
         />
         <StatCard
           label="Expired licences"
           value={expiredLicences.length}
           tone={expiredLicences.length ? "danger" : "ok"}
+          onClick={() => setTab("engineers")}
         />
       </div>
 

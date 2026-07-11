@@ -10,13 +10,40 @@ export function Pill({
   return <span className={`pill ${tone}`}>{children}</span>;
 }
 
-export function StatCard({ label, value, tone }: { label: string; value: ReactNode; tone?: string }) {
+export function StatCard({
+  label,
+  value,
+  tone,
+  onClick,
+}: {
+  label: string;
+  value: ReactNode;
+  tone?: string;
+  onClick?: () => void; // drills down into the view behind the number
+}) {
+  const interactive = onClick
+    ? {
+        role: "button" as const,
+        tabIndex: 0,
+        onClick,
+        onKeyDown: (e: React.KeyboardEvent) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        },
+        "aria-label": `${label} — open detail`,
+      }
+    : {};
   return (
-    <div className="card">
+    <div className={`card${onClick ? " clickable stat-drill" : ""}`} {...interactive}>
       <div className="stat" style={tone ? { color: `var(--${tone})` } : undefined}>
         {value}
       </div>
-      <div className="stat-label">{label}</div>
+      <div className="stat-label">
+        {label}
+        {onClick && <span className="stat-arrow" aria-hidden> ›</span>}
+      </div>
     </div>
   );
 }
