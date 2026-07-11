@@ -50,6 +50,23 @@ export function LifeBar({ pct, tone }: { pct: number; tone: "ok" | "warn" | "dan
   );
 }
 
+// In-app cross-reference: looks like a link, navigates with go(tab, focusId).
+export function EntityLink({
+  onClick,
+  children,
+  title,
+}: {
+  onClick: () => void;
+  children: ReactNode;
+  title?: string;
+}) {
+  return (
+    <button type="button" className="entity-link" onClick={onClick} title={title}>
+      {children}
+    </button>
+  );
+}
+
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
     <p className="muted" style={{ padding: "24px 4px", textAlign: "center" }}>

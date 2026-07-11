@@ -5,6 +5,7 @@ interface Item {
   label: string;
   sublabel: string;
   target: Tab;
+  focusId?: string; // deep-link: record the target view should select/highlight
   ask?: string; // when set, selecting hands the query to the AI assistant
 }
 
@@ -28,6 +29,7 @@ function buildIndex(store: Store): Item[] {
       label: `${a.registration} · ${a.type_designator}`,
       sublabel: `Aircraft — ${a.status.replace(/_/g, " ")} at ${a.base}`,
       target: "fleet" as Tab,
+      focusId: a.id,
     })),
     ...store.defects
       .filter((d) => d.status !== "closed")
@@ -35,11 +37,13 @@ function buildIndex(store: Store): Item[] {
         label: d.description.slice(0, 70),
         sublabel: `Defect — ${reg(d.aircraft_id)} · ${d.status}`,
         target: "defects" as Tab,
+        focusId: d.id,
       })),
     ...store.workOrders.map((w) => ({
       label: `${w.wo_number} — ${w.title}`,
       sublabel: `Work order — ${reg(w.aircraft_id)} · ${w.status.replace(/_/g, " ")}`,
       target: "workorders" as Tab,
+      focusId: w.id,
     })),
     ...store.parts.map((p) => ({
       label: `${p.part_number} — ${p.description}`,
@@ -84,7 +88,7 @@ export default function CommandPalette({
   store: Store;
   open: boolean;
   onClose: () => void;
-  go: (t: Tab) => void;
+  go: (t: Tab, focusId?: string) => void;
   onAsk: (question: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -124,13 +128,13 @@ export default function CommandPalette({
   function pick(item: Item) {
     onClose();
     if (item.ask) onAsk(item.ask);
-    else go(item.target);
+    else go(item.target, item.focusId);
   }
 
   return (
     <>
       <div className="palette-backdrop" onClick={onClose} aria-hidden />
-      <div className="palette" role="dialog" aria-label="Search everything">
+      <div className="palette" role="dialog" aria-modal="true" aria-label="Search everything">
         <input
           ref={inputRef}
           value={query}

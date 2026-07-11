@@ -1,5 +1,5 @@
-import type { Store } from "../App";
-import { Pill, StatCard, LifeBar } from "../components/ui";
+import type { Store, Tab } from "../App";
+import { EntityLink, Pill, StatCard, LifeBar } from "../components/ui";
 import { mpDue, llpStatus, type DueItem, type Tone } from "../lib/compliance";
 
 const TONE_ORDER: Record<Tone, number> = { danger: 0, warn: 1, ok: 2 };
@@ -24,7 +24,13 @@ function intervalLabel(task: DueItem["task"]): string {
   return parts.length > 0 ? parts.join(" / ") : "—";
 }
 
-export default function Planning({ store }: { store: Store }) {
+export default function Planning({
+  store,
+  go,
+}: {
+  store: Store;
+  go: (t: Tab, focusId?: string) => void;
+}) {
   const dueItems: DueItem[] = store.mpCompliance
     .map((c) => {
       const task = store.mpTasks.find((t) => t.id === c.mp_task_id);
@@ -78,7 +84,11 @@ export default function Planning({ store }: { store: Store }) {
                   {d.task.task_code}
                 </td>
                 <td>{d.task.title}</td>
-                <td>{d.aircraft.registration}</td>
+                <td>
+                  <EntityLink onClick={() => go("fleet", d.aircraft.id)} title="View aircraft in Fleet">
+                    {d.aircraft.registration}
+                  </EntityLink>
+                </td>
                 <td className="muted">{intervalLabel(d.task)}</td>
                 <td className="muted">
                   {d.compliance.last_done_date
@@ -136,7 +146,15 @@ export default function Planning({ store }: { store: Store }) {
                     : "—";
               return (
                 <tr key={llp.id}>
-                  <td>{ac?.registration ?? "—"}</td>
+                  <td>
+                    {ac ? (
+                      <EntityLink onClick={() => go("fleet", ac.id)} title="View aircraft in Fleet">
+                        {ac.registration}
+                      </EntityLink>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td>{llp.part_number}</td>
                   <td className="muted">{llp.serial_number}</td>
                   <td>{llp.description}</td>

@@ -1,11 +1,19 @@
-import type { Store } from "../App";
-import { statusPill, Pill } from "../components/ui";
+import type { Store, Tab } from "../App";
+import { statusPill, Pill, EntityLink } from "../components/ui";
 import { mpDue, type DueItem, type Tone } from "../lib/compliance";
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const TONE_RANK: Record<Tone, number> = { danger: 0, warn: 1, ok: 2 };
 
-export default function Fleet({ store }: { store: Store }) {
+export default function Fleet({
+  store,
+  go,
+  focus,
+}: {
+  store: Store;
+  go: (t: Tab, focusId?: string) => void;
+  focus: string | null;
+}) {
   function sectorsLast7Days(aircraftId: string): number {
     const cutoff = Date.now() - SEVEN_DAYS_MS;
     return store.flights.filter(
@@ -63,7 +71,7 @@ export default function Fleet({ store }: { store: Store }) {
               const defects = store.defects.filter((d) => d.aircraft_id === a.id && d.status !== "closed");
               const due = worstDue(a.id);
               return (
-                <tr key={a.id}>
+                <tr key={a.id} className={focus === a.id ? "row-focus" : ""}>
                   <td><strong>{a.registration}</strong></td>
                   <td>{a.type_designator}</td>
                   <td className="muted">{a.msn}</td>
@@ -71,7 +79,11 @@ export default function Fleet({ store }: { store: Store }) {
                   <td>{Number(a.total_hours).toLocaleString("en-GB")}</td>
                   <td>{a.total_cycles.toLocaleString("en-GB")}</td>
                   <td>{statusPill(a.status)}</td>
-                  <td>{sectorsLast7Days(a.id)}</td>
+                  <td>
+                    <EntityLink onClick={() => go("techlog", a.id)} title="Open tech log for this aircraft">
+                      {sectorsLast7Days(a.id)}
+                    </EntityLink>
+                  </td>
                   <td>
                     {due ? (
                       <>
@@ -88,7 +100,13 @@ export default function Fleet({ store }: { store: Store }) {
                     )}
                   </td>
                   <td>
-                    {defects.length ? <Pill tone="warn">{defects.length}</Pill> : <span className="muted">0</span>}
+                    {defects.length ? (
+                      <EntityLink onClick={() => go("defects", defects[0].id)} title="View defects">
+                        <Pill tone="warn">{defects.length}</Pill>
+                      </EntityLink>
+                    ) : (
+                      <span className="muted">0</span>
+                    )}
                   </td>
                 </tr>
               );

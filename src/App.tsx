@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import { hasApiKey, setApiKey } from "./lib/ai";
@@ -103,6 +103,14 @@ interface NavItem {
   badge?: number;
 }
 
+// g-then-letter navigation (gmail-style). Documented in the ? help overlay.
+const G_SHORTCUTS: Record<string, Tab> = {
+  d: "dashboard", m: "mywork", f: "fleet", t: "techlog", x: "defects",
+  w: "workorders", p: "planning", s: "parts", o: "tooling", i: "directives",
+  r: "reliability", q: "quality", e: "engineers", k: "workforce",
+  g: "settings", a: "assistant",
+};
+
 export default function App() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [store, setStore] = useState<Store>(EMPTY);
@@ -114,13 +122,49 @@ export default function App() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [askSeed, setAskSeed] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  // Deep-link focus: which record the target view should select/highlight.
+  const [focus, setFocus] = useState<string | null>(null);
+  const pendingG = useRef(false);
 
-  // ⌘K / Ctrl+K opens the command palette from anywhere.
+  // Global keyboard shortcuts: ⌘K or / = palette, ? = help, g+<letter> = go to view.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement;
+      const typing =
+        t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPaletteOpen((o) => !o);
+        return;
+      }
+      if (typing) return;
+      if (e.key === "/") {
+        e.preventDefault();
+        setPaletteOpen(true);
+        return;
+      }
+      if (e.key === "?") {
+        setHelpOpen((o) => !o);
+        return;
+      }
+      if (e.key === "Escape") {
+        setHelpOpen(false);
+        return;
+      }
+      if (pendingG.current) {
+        pendingG.current = false;
+        const target = G_SHORTCUTS[e.key.toLowerCase()];
+        if (target) {
+          e.preventDefault();
+          setTab(target);
+          setFocus(null);
+        }
+        return;
+      }
+      if (e.key.toLowerCase() === "g" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        pendingG.current = true;
+        window.setTimeout(() => (pendingG.current = false), 1500);
       }
     }
     window.addEventListener("keydown", onKey);
@@ -286,8 +330,9 @@ export default function App() {
     }
   }
 
-  function go(t: Tab) {
+  function go(t: Tab, focusId?: string) {
     setTab(t);
+    setFocus(focusId ?? null);
     setMoreOpen(false);
   }
 
@@ -304,16 +349,19 @@ export default function App() {
 
   const account = session.user.user_metadata?.user_name ?? session.user.email ?? "signed in";
 
+  const currentGroup = NAV_GROUPS.find((g) => g.items.some((i) => i.id === tab));
+  const currentItem = ALL_ITEMS.find((i) => i.id === tab);
+
   const view = (
     <>
       {tab === "dashboard" && <Dashboard store={store} setTab={go} keySet={keySet} onNeedKey={handleKey} />}
       {tab === "mywork" && <MyWork store={store} reload={reload} />}
-      {tab === "fleet" && <Fleet store={store} />}
-      {tab === "techlog" && <TechLog store={store} reload={reload} />}
-      {tab === "defects" && <Defects store={store} reload={reload} keySet={keySet} onNeedKey={handleKey} />}
-      {tab === "workorders" && <WorkOrders store={store} reload={reload} keySet={keySet} onNeedKey={handleKey} />}
-      {tab === "planning" && <Planning store={store} />}
-      {tab === "parts" && <Parts store={store} />}
+      {tab === "fleet" && <Fleet store={store} go={go} focus={focus} />}
+      {tab === "techlog" && <TechLog store={store} reload={reload} go={go} focus={focus} />}
+      {tab === "defects" && <Defects store={store} reload={reload} keySet={keySet} onNeedKey={handleKey} go={go} focus={focus} />}
+      {tab === "workorders" && <WorkOrders store={store} reload={reload} keySet={keySet} onNeedKey={handleKey} go={go} focus={focus} />}
+      {tab === "planning" && <Planning store={store} go={go} />}
+      {tab === "parts" && <Parts store={store} go={go} />}
       {tab === "tooling" && <Tooling store={store} reload={reload} />}
       {tab === "directives" && <Directives store={store} />}
       {tab === "reliability" && <Reliability store={store} />}
@@ -399,6 +447,16 @@ export default function App() {
       </header>
 
       <main className="main" id="main">
+        <nav className="crumbs" aria-label="Breadcrumb">
+          <button onClick={() => go("dashboard")}>AeroMRO</button>
+          <span aria-hidden>›</span>
+          <span>{currentGroup?.label}</span>
+          <span aria-hidden>›</span>
+          <strong aria-current="page">{currentItem?.label}</strong>
+          <button className="crumbs-help" onClick={() => setHelpOpen(true)} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">
+            ?
+          </button>
+        </nav>
         {error && (
           <div className="banner danger" role="alert">
             Data error: {error} — check your Supabase URL/key in <code>.env.local</code> and that migrations have been applied.
@@ -431,6 +489,44 @@ export default function App() {
           {moreBadge ? <span className="badge">{moreBadge}</span> : null}
         </button>
       </nav>
+
+      {/* Keyboard shortcuts help */}
+      {helpOpen && (
+        <>
+          <div className="sheet-backdrop" onClick={() => setHelpOpen(false)} aria-hidden />
+          <div className="kbd-help" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+            <h3>Keyboard shortcuts</h3>
+            <div className="kbd-grid">
+              <div><kbd>⌘K</kbd> or <kbd>/</kbd></div><div>Search everything</div>
+              <div><kbd>?</kbd></div><div>This help</div>
+              <div><kbd>g</kbd> then <kbd>d</kbd></div><div>Dashboard</div>
+              <div><kbd>g</kbd> then <kbd>m</kbd></div><div>My Work</div>
+              <div><kbd>g</kbd> then <kbd>f</kbd></div><div>Fleet</div>
+              <div><kbd>g</kbd> then <kbd>t</kbd></div><div>Tech Log</div>
+              <div><kbd>g</kbd> then <kbd>x</kbd></div><div>Defects</div>
+              <div><kbd>g</kbd> then <kbd>w</kbd></div><div>Work Orders</div>
+              <div><kbd>g</kbd> then <kbd>p</kbd></div><div>Planning & LLP</div>
+              <div><kbd>g</kbd> then <kbd>s</kbd></div><div>Parts & Stores</div>
+              <div><kbd>g</kbd> then <kbd>o</kbd></div><div>Tooling</div>
+              <div><kbd>g</kbd> then <kbd>i</kbd></div><div>AD / SB</div>
+              <div><kbd>g</kbd> then <kbd>r</kbd></div><div>Reliability</div>
+              <div><kbd>g</kbd> then <kbd>q</kbd></div><div>Quality & Audit</div>
+              <div><kbd>g</kbd> then <kbd>e</kbd></div><div>Certifying Staff</div>
+              <div><kbd>g</kbd> then <kbd>k</kbd></div><div>Workforce</div>
+              <div><kbd>g</kbd> then <kbd>g</kbd></div><div>Settings</div>
+              <div><kbd>g</kbd> then <kbd>a</kbd></div><div>AI Assistant</div>
+            </div>
+            <button
+              className="btn ghost"
+              style={{ marginTop: 14, width: "100%" }}
+              onClick={() => setHelpOpen(false)}
+              autoFocus
+            >
+              Close (Esc)
+            </button>
+          </div>
+        </>
+      )}
 
       <CommandPalette
         store={store}

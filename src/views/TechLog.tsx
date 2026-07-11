@@ -1,11 +1,22 @@
 import { useMemo, useState } from "react";
-import type { Store } from "../App";
+import type { Store, Tab } from "../App";
 import { supabase } from "../lib/supabase";
 import { rollOntoAircraft } from "../lib/actions";
-import { Pill, StatCard, EmptyState } from "../components/ui";
+import { EntityLink, Pill, StatCard, EmptyState } from "../components/ui";
 
-export default function TechLog({ store, reload }: { store: Store; reload: () => Promise<void> }) {
-  const [aircraftFilter, setAircraftFilter] = useState("");
+export default function TechLog({
+  store,
+  reload,
+  go,
+  focus,
+}: {
+  store: Store;
+  reload: () => Promise<void>;
+  go: (t: Tab, focusId?: string) => void;
+  focus: string | null;
+}) {
+  // A deep link (e.g. from Fleet's sector count) pre-filters to that aircraft.
+  const [aircraftFilter, setAircraftFilter] = useState(focus ?? "");
   const [closingId, setClosingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -167,7 +178,15 @@ export default function TechLog({ store, reload }: { store: Store; reload: () =>
                     <td>{new Date(f.flight_date).toLocaleDateString("en-GB")}</td>
                     <td>{f.flight_no}</td>
                     <td>{f.dep}&rarr;{f.arr}</td>
-                    <td>{ac?.registration ?? "—"}</td>
+                    <td>
+                      {ac ? (
+                        <EntityLink onClick={() => go("fleet", ac.id)} title="View aircraft in Fleet">
+                          {ac.registration}
+                        </EntityLink>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td>{Number(f.block_hours).toFixed(1)}</td>
                     <td>{f.cycles}</td>
                     <td>{f.captain}</td>

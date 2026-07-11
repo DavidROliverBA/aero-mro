@@ -172,7 +172,7 @@ h2 { font-size: 16px; margin: 24px 0 10px; }
 /* Tables */
 table { width: 100%; border-collapse: collapse; background: var(--panel); font-size: 13px; }
 th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
-th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; white-space: nowrap; }
 tr:last-child td { border-bottom: none; }
 tbody tr:hover td { background: var(--panel-2); }
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; -webkit-overflow-scrolling: touch; }
@@ -236,6 +236,46 @@ legend { font-size: 12px; color: var(--muted); padding: 0 6px; }
 .chat-input { display: flex; gap: 8px; margin-top: 14px; }
 .chat-input input { flex: 1; }
 
+/* Cross-links, breadcrumbs, shortcuts help ---------------------------------- */
+.entity-link {
+  background: none; border: none; padding: 0; font: inherit; cursor: pointer;
+  color: var(--accent); font-weight: 600;
+  /* Persistent underline: interactivity must not rely on colour alone (WCAG 1.4.1). */
+  text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  text-underline-offset: 2px;
+}
+.entity-link:hover { text-decoration-color: var(--accent); }
+
+.crumbs {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--muted); margin-bottom: 14px;
+}
+.crumbs button {
+  background: none; border: none; padding: 0; font: inherit; cursor: pointer;
+  color: var(--muted);
+}
+.crumbs button:hover { color: var(--accent); }
+.crumbs strong { color: var(--text); font-weight: 600; }
+.crumbs .crumbs-help {
+  margin-left: auto; border: 1px solid var(--border); border-radius: 50%;
+  width: 22px; height: 22px; line-height: 1; color: var(--muted);
+}
+.crumbs .crumbs-help:hover { color: var(--accent); border-color: var(--accent); }
+
+.kbd-help {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 24px)); max-height: 80vh; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  z-index: 41; padding: 18px;
+}
+.kbd-help h3 { margin: 0 0 12px; font-size: 15px; }
+.kbd-grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 13px; align-items: center; }
+kbd {
+  background: var(--panel-2); border: 1px solid var(--border); border-bottom-width: 2px;
+  border-radius: 5px; padding: 1px 6px; font-size: 11.5px; font-family: var(--font);
+}
+.row-focus td { background: rgba(59, 130, 246, 0.12) !important; }
+
 /* Command palette --------------------------------------------------------- */
 .palette-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 40; }
 .palette {
@@ -258,3 +298,14 @@ legend { font-size: 12px; color: var(--muted); padding: 0 6px; }
 .banner { background: rgba(210,153,34,0.12); border: 1px solid rgba(210,153,34,0.3); color: var(--warn); padding: 10px 14px; border-radius: 8px; font-size: 12px; margin-bottom: 16px; }
 .banner.danger { background: rgba(248,81,73,0.1); border-color: rgba(248,81,73,0.3); color: var(--danger); }
 code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+/* Mobile touch targets — MUST STAY LAST IN THIS FILE. These re-assert the
+   44px/16px rules from the mobile-header media block above, which are
+   otherwise defeated by the later equal-specificity base button/input/table
+   rules (source order wins). Found by automated iPhone UX testing. */
+@media (max-width: 768px) {
+  button.btn { min-height: 44px; }
+  button.btn.small { min-height: 34px; }
+  input, textarea, select { min-height: 44px; font-size: 16px; }
+  th, td { padding: 12px 10px; }
+}

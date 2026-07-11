@@ -1,20 +1,24 @@
 import { useState } from "react";
-import type { Store } from "../App";
+import type { Store, Tab } from "../App";
 import { supabase } from "../lib/supabase";
 import { triageDefect, type TriageResult } from "../lib/ai";
 import { melClock } from "../lib/compliance";
-import { Pill } from "../components/ui";
+import { EntityLink, Pill } from "../components/ui";
 
 export default function Defects({
   store,
   reload,
   keySet,
   onNeedKey,
+  go,
+  focus,
 }: {
   store: Store;
   reload: () => Promise<void>;
   keySet: boolean;
   onNeedKey: () => void;
+  go: (t: Tab, focusId?: string) => void;
+  focus: string | null;
 }) {
   const [acId, setAcId] = useState(store.aircraft[0]?.id ?? "");
   const [desc, setDesc] = useState("");
@@ -156,15 +160,21 @@ export default function Defects({
               <th>Severity</th>
               <th>Status</th>
               <th>MEL clock</th>
+              <th>WO</th>
               <th>Raised</th>
             </tr>
           </thead>
           <tbody>
             {store.defects.map((d) => {
               const clock = melClock(d);
+              const wo = store.workOrders.find((w) => w.source_defect === d.id);
               return (
-                <tr key={d.id}>
-                  <td><strong>{acName(d.aircraft_id)}</strong></td>
+                <tr key={d.id} className={focus === d.id ? "row-focus" : ""}>
+                  <td>
+                    <EntityLink onClick={() => go("fleet", d.aircraft_id)} title="View aircraft in Fleet">
+                      {acName(d.aircraft_id)}
+                    </EntityLink>
+                  </td>
                   <td style={{ maxWidth: 320 }}>
                     {d.description} {d.ai_triaged && <span className="ai-tag" title="AI-triaged">✨</span>}
                   </td>
@@ -184,6 +194,15 @@ export default function Defects({
                           ? `${Math.abs(clock.daysRemaining)}d overdue`
                           : `${clock.daysRemaining}d left`}
                       </Pill>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
+                  <td>
+                    {wo ? (
+                      <EntityLink onClick={() => go("workorders", wo.id)} title="Open work order">
+                        {wo.wo_number}
+                      </EntityLink>
                     ) : (
                       <span className="muted">—</span>
                     )}

@@ -4,3 +4,8 @@ dist
 .env.local
 *.log
 .DS_Store
+
+# Playwright
+tests/.auth-state.json
+playwright-report/
+test-results/

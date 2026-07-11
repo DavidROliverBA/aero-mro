@@ -1,5 +1,5 @@
-import type { Store } from "../App";
-import { Pill, StatCard } from "../components/ui";
+import type { Store, Tab } from "../App";
+import { EntityLink, Pill, StatCard } from "../components/ui";
 import { shelfLife } from "../lib/compliance";
 
 const COND_TONE: Record<string, "ok" | "warn" | "danger" | "muted"> = {
@@ -9,7 +9,13 @@ const COND_TONE: Record<string, "ok" | "warn" | "danger" | "muted"> = {
   scrap: "danger",
 };
 
-export default function Parts({ store }: { store: Store }) {
+export default function Parts({
+  store,
+  go,
+}: {
+  store: Store;
+  go: (t: Tab, focusId?: string) => void;
+}) {
   const serviceable = store.parts.filter((p) => p.condition === "serviceable");
   const quarantine = store.parts.filter((p) => p.condition === "quarantine");
   const unserviceable = store.parts.filter((p) => p.condition === "unserviceable");
@@ -79,7 +85,15 @@ export default function Parts({ store }: { store: Store }) {
                     {noForm1 && <Pill tone="warn">no Form 1</Pill>}
                   </td>
                   <td>{p.form1_ref ? <code>{p.form1_ref}</code> : <Pill tone="danger">missing</Pill>}</td>
-                  <td>{fitted ? fitted.registration : <span className="muted">stores</span>}</td>
+                  <td>
+                    {fitted ? (
+                      <EntityLink onClick={() => go("fleet", fitted.id)} title="View aircraft in Fleet">
+                        {fitted.registration}
+                      </EntityLink>
+                    ) : (
+                      <span className="muted">stores</span>
+                    )}
+                  </td>
                   <td>{shelf ? <Pill tone={shelf.tone}>{shelf.label}</Pill> : <span className="muted">—</span>}</td>
                 </tr>
               );

@@ -1,9 +1,9 @@
-import { useMemo, useState, type ReactNode } from "react";
-import type { Store } from "../App";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import type { Store, Tab } from "../App";
 import { supabase } from "../lib/supabase";
 import { draftCrsStatement } from "../lib/ai";
 import { checkCertifyingPrivilege, crsBlockers } from "../lib/compliance";
-import { Pill } from "../components/ui";
+import { EntityLink, Pill } from "../components/ui";
 
 const WO_TONE: Record<string, "ok" | "warn" | "danger" | "muted" | "info"> = {
   open: "muted",
@@ -18,13 +18,21 @@ export default function WorkOrders({
   reload,
   keySet,
   onNeedKey,
+  go,
+  focus,
 }: {
   store: Store;
   reload: () => Promise<void>;
   keySet: boolean;
   onNeedKey: () => void;
+  go: (t: Tab, focusId?: string) => void;
+  focus: string | null;
 }) {
-  const [selected, setSelected] = useState<string | null>(store.workOrders[0]?.id ?? null);
+  const [selected, setSelected] = useState<string | null>(focus ?? store.workOrders[0]?.id ?? null);
+  // Deep links (e.g. from a defect row) select the referenced work order.
+  useEffect(() => {
+    if (focus) setSelected(focus);
+  }, [focus]);
   const wo = store.workOrders.find((w) => w.id === selected);
   const ac = wo && store.aircraft.find((a) => a.id === wo.aircraft_id);
   const tasks = useMemo(
@@ -192,8 +200,24 @@ export default function WorkOrders({
                   <Pill tone={WO_TONE[wo.status]}>{wo.status.replace(/_/g, " ")}</Pill>
                 </div>
                 <div className="muted" style={{ fontSize: 13 }}>
-                  {wo.wo_number} · {ac?.registration} ({ac?.type_designator}) · opened{" "}
-                  {new Date(wo.opened_at).toLocaleDateString("en-GB")}
+                  {wo.wo_number} ·{" "}
+                  {ac && (
+                    <EntityLink onClick={() => go("fleet", ac.id)} title="View aircraft in Fleet">
+                      {ac.registration}
+                    </EntityLink>
+                  )}{" "}
+                  ({ac?.type_designator}) · opened {new Date(wo.opened_at).toLocaleDateString("en-GB")}
+                  {wo.source_defect && (() => {
+                    const src = store.defects.find((d) => d.id === wo.source_defect);
+                    return (
+                      <>
+                        {" · raised from "}
+                        <EntityLink onClick={() => go("defects", wo.source_defect!)} title="View source defect">
+                          defect{src ? ` “${src.description.slice(0, 42)}${src.description.length > 42 ? "…" : ""}”` : ""}
+                        </EntityLink>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 
