@@ -19,17 +19,23 @@ const PERSONA_KEY = "aeromro.engineerId";
 export default function MyWork({
   store,
   reload,
+  account,
 }: {
   store: Store;
   reload: () => Promise<void>;
+  account: string;
 }) {
-  const [meId, setMeId] = useState<string>(() => localStorage.getItem(PERSONA_KEY) ?? "");
+  const [personaId, setPersonaId] = useState<string>(() => localStorage.getItem(PERSONA_KEY) ?? "");
   const [busyCard, setBusyCard] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // If the login is linked to an engineer (Settings → User management), the
+  // identity is bound — no persona picking, sign-offs are genuinely yours.
+  const linkedEngineerId = store.allowedUsers.find((u) => u.username === account)?.engineer_id ?? null;
+  const meId = linkedEngineerId ?? personaId;
   const me = store.engineersById.get(meId);
 
   function choose(id: string) {
-    setMeId(id);
+    setPersonaId(id);
     localStorage.setItem(PERSONA_KEY, id);
   }
 
@@ -78,22 +84,29 @@ export default function MyWork({
       <h1>My Work</h1>
       <p className="subtitle">Your cards, your inspections, your week — sign off without leaving the page</p>
 
-      <div className="row" style={{ marginBottom: 16 }}>
-        <label htmlFor="mw-me" style={{ margin: 0 }}>I am</label>
-        <select
-          id="mw-me"
-          value={meId}
-          onChange={(e) => choose(e.target.value)}
-          style={{ maxWidth: 320 }}
-        >
-          <option value="">— select yourself —</option>
-          {store.engineers.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.full_name} · {e.staff_no}
-            </option>
-          ))}
-        </select>
-      </div>
+      {linkedEngineerId ? (
+        <p style={{ marginBottom: 16 }}>
+          Signed in as <strong>{me?.full_name}</strong>{" "}
+          <span className="muted">({me?.staff_no} — identity bound to your login)</span>
+        </p>
+      ) : (
+        <div className="row" style={{ marginBottom: 16 }}>
+          <label htmlFor="mw-me" style={{ margin: 0 }}>I am</label>
+          <select
+            id="mw-me"
+            value={meId}
+            onChange={(e) => choose(e.target.value)}
+            style={{ maxWidth: 320 }}
+          >
+            <option value="">— select yourself —</option>
+            {store.engineers.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.full_name} · {e.staff_no}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {error && <div className="banner danger" role="alert">{error}</div>}
 

@@ -111,8 +111,12 @@ function.
 
 ### 2. Auth
 
-GitHub OAuth via Supabase Auth — see [`AUTH.md`](AUTH.md). RLS restricts all
-tables to authenticated users.
+Two ways in, both via Supabase Auth: **GitHub OAuth** (see [`AUTH.md`](AUTH.md))
+or **username + password** accounts created in Settings → User management
+(credentials bcrypt-hashed by GoTrue; usernames map to synthetic
+`@aeromro.demo` emails). Both feed the same `allowed_users` registry that RLS
+checks on every table. Linking an account to an engineer binds My Work and
+task sign-offs to the login identity.
 
 ### 3. Run
 

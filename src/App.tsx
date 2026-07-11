@@ -7,6 +7,7 @@ import type {
   AdCompliance,
   Aircraft,
   AirworthinessDirective,
+  AllowedUser,
   Audit,
   AuditFinding,
   Defect,
@@ -57,6 +58,7 @@ export interface Store {
   audits: Audit[];
   auditFindings: AuditFinding[];
   roster: RosterEntry[];
+  allowedUsers: AllowedUser[];
   // Lookup maps so views don't O(n) .find() inside render loops.
   aircraftById: Map<string, Aircraft>;
   engineersById: Map<string, Engineer>;
@@ -79,6 +81,7 @@ const EMPTY: Store = {
   audits: [],
   auditFindings: [],
   roster: [],
+  allowedUsers: [],
   aircraftById: new Map(),
   engineersById: new Map(),
 };
@@ -197,12 +200,13 @@ export default function App() {
         supabase.from("audits").select("*").order("audit_date", { ascending: false }),
         supabase.from("audit_findings").select("*"),
         supabase.from("roster_entries").select("*").order("duty_date"),
+        supabase.from("allowed_users").select("*").order("username"),
       ]);
       const failed = results.find((r) => r.error);
       if (failed?.error) throw failed.error;
       const [
         aircraft, engineers, defects, parts, workOrders, taskCards, directives, adCompliance,
-        flights, tools, mpTasks, mpCompliance, llps, audits, auditFindings, roster,
+        flights, tools, mpTasks, mpCompliance, llps, audits, auditFindings, roster, allowedUsers,
       ] = results;
       setStore({
         aircraft: aircraft.data ?? [],
@@ -221,6 +225,7 @@ export default function App() {
         audits: audits.data ?? [],
         auditFindings: auditFindings.data ?? [],
         roster: roster.data ?? [],
+        allowedUsers: allowedUsers.data ?? [],
         aircraftById: new Map((aircraft.data ?? []).map((a: Aircraft) => [a.id, a])),
         engineersById: new Map((engineers.data ?? []).map((e: Engineer) => [e.id, e])),
       });
@@ -366,7 +371,7 @@ export default function App() {
   const view = (
     <>
       {tab === "dashboard" && <Dashboard store={store} setTab={go} keySet={keySet} onNeedKey={handleKey} />}
-      {tab === "mywork" && <MyWork store={store} reload={reload} />}
+      {tab === "mywork" && <MyWork store={store} reload={reload} account={account} />}
       {tab === "fleet" && <Fleet store={store} go={go} focus={focus} />}
       {tab === "techlog" && <TechLog store={store} reload={reload} go={go} focus={focus} />}
       {tab === "defects" && <Defects store={store} reload={reload} keySet={keySet} onNeedKey={handleKey} go={go} focus={focus} />}
@@ -379,7 +384,9 @@ export default function App() {
       {tab === "quality" && <Quality store={store} reload={reload} />}
       {tab === "engineers" && <Engineers store={store} />}
       {tab === "workforce" && <Workforce store={store} reload={reload} />}
-      {tab === "settings" && <Settings reload={reload} keySet={keySet} onSetKey={onSetKey} />}
+      {tab === "settings" && (
+        <Settings store={store} reload={reload} keySet={keySet} onSetKey={onSetKey} account={account} />
+      )}
       {tab === "assistant" && (
         <Assistant
           store={store}

@@ -205,3 +205,10 @@ export interface RosterEntry {
   shift: DutyShift;
   base: string;
 }
+
+export interface AllowedUser {
+  username: string;
+  engineer_id: string | null;
+  auth_kind: "github" | "password";
+  added_at: string;
+}
