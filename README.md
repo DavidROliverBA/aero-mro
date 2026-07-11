@@ -66,6 +66,23 @@ handed straight to the AI assistant. See [`docs/path-to-v1.md`](docs/path-to-v1.
 for the plan (phases, integrations, effort) to take this from demonstration
 to production.
 
+### MCP server — drive it from Claude Code
+
+`mcp/server.ts` is a stdio MCP server exposing the system as 12 typed,
+compliance-aware tools (`fleet_status`, `due_list`, `open_defects`,
+`work_order_status`, `coverage_and_staff`, `stores_and_tooling_alerts`, plus
+writes: `raise_defect`, `open_work_order`, `add_task_card`, `record_sector`,
+`set_roster`, `reset_demo`). It imports the exact same pure functions from
+`src/lib/compliance.ts` that drive the UI — one source of regulatory truth.
+The same red lines apply: sign-off, inspection, CRS, deferral and quarantine
+have no tools; writes are audit-logged as `MCP (Claude Code)`, and the MCP
+client's permission prompt is the human-confirmation step.
+
+Setup: add `SUPABASE_SERVICE_KEY=<service_role key>` to `.env.local`
+(dashboard → Settings → API — server-side only, never `VITE_`-prefixed). The
+server is registered in `.mcp.json` and starts automatically in Claude Code.
+Verify with `bun mcp/smoke.ts`.
+
 ### Designed for the hangar floor
 
 The research is unambiguous: the mechanic at the aircraft is every incumbent's
