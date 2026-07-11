@@ -193,8 +193,8 @@ export default function Engineers({
           </div>
           <p className="muted" style={{ fontSize: 11, margin: "8px 0 0" }}>
             Without a certifying category (B1/B2/C), a type rating and company authorisation, the
-            engineer cannot sign a CRS — the gates enforce it. Demo note: a data reset restores the
-            seeded five.
+            engineer cannot sign a CRS — the gates enforce it. Engineers you add here survive a
+            demo data reset.
           </p>
           {msg && (
             <div className={`banner ${msg.startsWith("Failed") ? "danger" : ""}`} style={{ marginTop: 10, marginBottom: 0 }} role="status">
