@@ -37,6 +37,7 @@ import Reliability from "./views/Reliability";
 import Quality from "./views/Quality";
 import Engineers from "./views/Engineers";
 import Workforce from "./views/Workforce";
+import Settings from "./views/Settings";
 import Assistant from "./views/Assistant";
 
 export interface Store {
@@ -92,6 +93,7 @@ export type Tab =
   | "quality"
   | "engineers"
   | "workforce"
+  | "settings"
   | "assistant";
 
 interface NavItem {
@@ -262,6 +264,7 @@ export default function App() {
       label: "Management",
       items: [
         { id: "workforce", label: "Workforce", icon: "👥", badge: rosterGaps || undefined },
+        { id: "settings", label: "Settings", icon: "🎛" },
       ],
     },
     {
@@ -317,6 +320,7 @@ export default function App() {
       {tab === "quality" && <Quality store={store} reload={reload} />}
       {tab === "engineers" && <Engineers store={store} />}
       {tab === "workforce" && <Workforce store={store} reload={reload} />}
+      {tab === "settings" && <Settings reload={reload} keySet={keySet} onNeedKey={handleKey} />}
       {tab === "assistant" && (
         <Assistant
           store={store}

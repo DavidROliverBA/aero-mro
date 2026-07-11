@@ -197,7 +197,7 @@ export const AGENT_TOOLS: AgentToolDef[] = [
           enum: [
             "dashboard", "mywork", "fleet", "techlog", "defects", "workorders", "planning",
             "parts", "tooling", "directives", "reliability", "quality", "engineers",
-            "workforce", "assistant",
+            "workforce", "settings", "assistant",
           ],
         },
       },

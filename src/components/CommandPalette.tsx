@@ -16,7 +16,8 @@ function buildIndex(store: Store): Item[] {
       ["techlog", "Tech Log"], ["defects", "Defects"], ["workorders", "Work Orders"],
       ["planning", "Planning & LLP"], ["parts", "Parts & Stores"], ["tooling", "Tooling"],
       ["directives", "AD / SB"], ["reliability", "Reliability"], ["quality", "Quality & Audit"],
-      ["engineers", "Certifying Staff"], ["workforce", "Workforce"], ["assistant", "AI Assistant"],
+      ["engineers", "Certifying Staff"], ["workforce", "Workforce"], ["settings", "Settings"],
+      ["assistant", "AI Assistant"],
     ] as [Tab, string][]
   ).map(([target, label]) => ({ label, sublabel: "Go to view", target }));
 

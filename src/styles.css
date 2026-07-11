@@ -1,4 +1,5 @@
-:root {
+:root,
+:root[data-theme="dark"] {
   --bg: #0e1116;
   --panel: #161b22;
   --panel-2: #1c232d;
@@ -12,6 +13,22 @@
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --nav-h: 58px; /* mobile bottom bar */
 }
+
+:root[data-theme="light"] {
+  --bg: #f4f6f9;
+  --panel: #ffffff;
+  --panel-2: #eef1f5;
+  --border: #d7dee7;
+  --text: #1a2330;
+  --muted: #5b6b7b;
+  --accent: #2563eb;
+  --ok: #1a7f37;
+  --warn: #9a6700;
+  --danger: #d1242f;
+}
+:root[data-theme="light"] .palette { box-shadow: 0 12px 40px rgba(30, 41, 59, 0.25); }
+:root[data-theme="light"] .sheet-backdrop,
+:root[data-theme="light"] .palette-backdrop { background: rgba(30, 41, 59, 0.35); }
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
