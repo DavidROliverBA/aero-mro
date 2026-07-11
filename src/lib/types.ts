@@ -195,3 +195,13 @@ export interface AuditFinding {
   status: "open" | "closed";
   closed_at: string | null;
 }
+
+export type DutyShift = "early" | "late" | "night" | "off" | "leave" | "training";
+
+export interface RosterEntry {
+  id: string;
+  engineer_id: string;
+  duty_date: string;
+  shift: DutyShift;
+  base: string;
+}

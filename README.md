@@ -37,6 +37,7 @@ AI at *assistance* level. So AeroMRO's thesis is simple:
 | **Reliability** | reliability programme | Defect trends by ATA, rates per aircraft, **chronic-defect detection** (repeat offenders / NFF risk) |
 | **Quality & Audit** | 145.A.65 | Audits, findings, CAPA tracking; findings can't close without a corrective action |
 | **Certifying Staff** | Part-66 | Licence categories, type ratings, expiry, company authorisation |
+| **Workforce Planning** | 145.A.30 | Duty roster, man-hour plan (capacity vs open backlog per base), **certifying-coverage gap detection**, licence-renewal horizon |
 
 ### The AI layer (Claude)
 

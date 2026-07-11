@@ -178,7 +178,8 @@ export const AGENT_TOOLS: AgentToolDef[] = [
           type: "string",
           enum: [
             "dashboard", "fleet", "techlog", "defects", "workorders", "planning",
-            "parts", "tooling", "directives", "reliability", "quality", "engineers", "assistant",
+            "parts", "tooling", "directives", "reliability", "quality", "engineers",
+            "workforce", "assistant",
           ],
         },
       },
@@ -247,6 +248,20 @@ export const AGENT_TOOLS: AgentToolDef[] = [
     ),
   },
   {
+    name: "set_roster",
+    description:
+      "Set or change an engineer's duty on the roster for one date (a management act, not a certification act). Requires human confirmation.",
+    input_schema: obj(
+      {
+        engineer_staff_no: { type: "string", description: "e.g. ENG-1042" },
+        date: { type: "string", description: "YYYY-MM-DD" },
+        shift: { type: "string", enum: ["early", "late", "night", "off", "leave", "training"] },
+        base: { type: "string", description: "Duty station, e.g. LGW or LHR" },
+      },
+      ["engineer_staff_no", "date", "shift", "base"],
+    ),
+  },
+  {
     name: "update_aircraft_status",
     description: "Change an aircraft's operational status. Requires human confirmation.",
     input_schema: obj(
@@ -301,7 +316,8 @@ const AGENT_SYSTEM =
   "the relevant view instead and use navigate to take them there; (3) flag any compliance risk you " +
   "notice (expired licences, MEL clocks, overdue ADs/checks, calibration, shelf-life, LLP limits); " +
   "(4) British English, concise; (5) refs in the snapshot like 'ref' fields are 8-char ids — use them " +
-  "in tool inputs where a ref is required.";
+  "in tool inputs where a ref is required; (6) also watch the roster for certifying-coverage gaps " +
+  "(a base/day where no rostered engineer can legally certify a based type) and man-hour shortfalls.";
 
 export async function agentTurn(
   history: AgentMessage[],

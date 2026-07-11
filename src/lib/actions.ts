@@ -66,6 +66,10 @@ export function buildSnapshot(store: Store): string {
         status: c.status, next_due: c.next_due,
       })),
     })),
+    roster: store.roster.map((r) => {
+      const eng = store.engineers.find((e) => e.id === r.engineer_id);
+      return { staff_no: eng?.staff_no, name: eng?.full_name, date: r.duty_date, shift: r.shift, base: r.base };
+    }),
     audits: store.audits.map((a) => ({
       ref: a.audit_ref, area: a.area, reg_ref: a.regulation_ref, date: a.audit_date, status: a.status,
       findings: store.auditFindings.filter((f) => f.audit_id === a.id).map((f) => ({
@@ -117,6 +121,8 @@ export function describeAction(a: ProposedAction): string {
       return `Record sector ${str(i.flight_no)} ${str(i.dep)}→${str(i.arr)} on ${str(i.aircraft_reg)} (${str(i.block_hours)} FH)`;
     case "update_aircraft_status":
       return `Set ${str(i.aircraft_reg)} status to ${str(i.status).replace(/_/g, " ")} — ${str(i.reason)}`;
+    case "set_roster":
+      return `Roster ${str(i.engineer_staff_no)} as ${str(i.shift)} at ${str(i.base)} on ${str(i.date)}`;
     default:
       return `${a.tool}(${JSON.stringify(i)})`;
   }
@@ -244,6 +250,27 @@ export async function executeAction(
       if (error) throw error;
       await audit("Aircraft status changed", `${ac.registration} → ${str(i.status)}: ${str(i.reason)}`);
       return `${ac.registration} status set to ${str(i.status).replace(/_/g, " ")}.`;
+    }
+    case "set_roster": {
+      const eng = store.engineers.find(
+        (e) => e.staff_no.toLowerCase() === str(i.engineer_staff_no).toLowerCase(),
+      );
+      if (!eng) throw new Error(`Unknown engineer staff no ${str(i.engineer_staff_no)}`);
+      const { error } = await supabase.from("roster_entries").upsert(
+        {
+          engineer_id: eng.id,
+          duty_date: str(i.date),
+          shift: str(i.shift),
+          base: str(i.base).toUpperCase(),
+        },
+        { onConflict: "engineer_id,duty_date" },
+      );
+      if (error) throw error;
+      await audit(
+        "Roster amended",
+        `${eng.full_name} (${eng.staff_no}) → ${str(i.shift)} at ${str(i.base).toUpperCase()} on ${str(i.date)}`,
+      );
+      return `Roster updated — ${eng.full_name} is ${str(i.shift)} at ${str(i.base).toUpperCase()} on ${str(i.date)}.`;
     }
     default:
       throw new Error(`Unknown action ${a.tool}`);

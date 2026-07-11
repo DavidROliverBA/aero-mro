@@ -10,11 +10,25 @@ import type {
   LlpComponent,
   MpCompliance,
   MpTask,
+  RosterEntry,
   TaskCard,
   Tool,
 } from "./types";
 
 const DAY = 24 * 60 * 60 * 1000;
+
+// Format a Date as YYYY-MM-DD in LOCAL time. toISOString() renders UTC, which
+// shifts local-midnight dates back a day on UTC+ timezones (e.g. BST).
+export function localIso(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// YYYY-MM-DD for today + offset days, DST-safe (calendar arithmetic, not ms).
+export function localIsoOffset(offsetDays: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return localIso(d);
+}
 
 export function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -118,7 +132,7 @@ export function mpDue(task: MpTask, c: MpCompliance, ac: Aircraft): DueItem {
   if (task.interval_days !== null && c.last_done_date) {
     const due = new Date(c.last_done_date + "T00:00:00");
     due.setDate(due.getDate() + task.interval_days);
-    dueDate = due.toISOString().slice(0, 10);
+    dueDate = localIso(due);
     remainingDays = daysUntil(dueDate);
   }
 
@@ -268,4 +282,108 @@ export function shelfLife(expiry: string | null): { label: string; tone: Tone } 
   if (d < 0) return { label: `Shelf-life expired ${-d}d ago`, tone: "danger" };
   if (d <= 30) return { label: `Shelf-life expires in ${d}d`, tone: "warn" };
   return { label: `Shelf-life OK (${d}d)`, tone: "ok" };
+}
+
+// ---------------------------------------------------------------------------
+// Workforce planning — 145.A.30 man-hour plan + certifying-coverage gaps.
+// ---------------------------------------------------------------------------
+
+// Productive maintenance hours per rostered shift (industry convention:
+// roughly 75% of an 8h shift survives briefings, breaks and paperwork).
+export const SHIFT_PRODUCTIVE_HOURS: Record<string, number> = {
+  early: 6,
+  late: 6,
+  night: 5.5,
+  off: 0,
+  leave: 0,
+  training: 0,
+};
+
+export const WORKING_SHIFTS = new Set(["early", "late", "night"]);
+
+export interface BaseManHours {
+  base: string;
+  availableHrs: number; // rostered productive hours over the horizon
+  backlogHrs: number; // est_hours of open task cards on aircraft at this base
+  utilisationPct: number | null; // backlog / available
+  tone: Tone;
+}
+
+export function baseManHours(
+  base: string,
+  roster: RosterEntry[],
+  cards: TaskCard[],
+  workOrders: { id: string; aircraft_id: string; status: string }[],
+  aircraft: Aircraft[],
+  horizonDays = 7,
+): BaseManHours {
+  const startStr = localIsoOffset(0);
+  const endStr = localIsoOffset(horizonDays);
+  const availableHrs = roster
+    .filter((r) => r.base === base && r.duty_date >= startStr && r.duty_date < endStr)
+    .reduce((sum, r) => sum + (SHIFT_PRODUCTIVE_HOURS[r.shift] ?? 0), 0);
+  const baseAircraft = new Set(aircraft.filter((a) => a.base === base).map((a) => a.id));
+  const openWoIds = new Set(
+    workOrders.filter((w) => w.status !== "closed" && baseAircraft.has(w.aircraft_id)).map((w) => w.id),
+  );
+  const backlogHrs = cards
+    .filter((c) => openWoIds.has(c.work_order_id) && c.status !== "complete" && c.status !== "inspected")
+    .reduce((sum, c) => sum + Number(c.est_hours), 0);
+  const utilisationPct = availableHrs > 0 ? (backlogHrs / availableHrs) * 100 : null;
+  const tone: Tone =
+    utilisationPct === null ? "danger" : utilisationPct > 100 ? "danger" : utilisationPct > 80 ? "warn" : "ok";
+  return { base, availableHrs, backlogHrs, utilisationPct, tone };
+}
+
+export interface CoverageGap {
+  date: string;
+  base: string;
+  typeDesignator: string;
+  reason: string;
+}
+
+// For each of the next `horizonDays`, each base must have at least one rostered
+// working engineer who can legally certify each aircraft type at that base.
+export function coverageGaps(
+  roster: RosterEntry[],
+  engineers: Engineer[],
+  aircraft: Aircraft[],
+  horizonDays = 7,
+): CoverageGap[] {
+  const gaps: CoverageGap[] = [];
+  const bases = [...new Set(aircraft.map((a) => a.base))];
+  for (let i = 0; i < horizonDays; i++) {
+    const date = localIsoOffset(i);
+    for (const base of bases) {
+      const types = [...new Set(aircraft.filter((a) => a.base === base).map((a) => a.type_designator))];
+      const onDuty = roster
+        .filter((r) => r.duty_date === date && r.base === base && WORKING_SHIFTS.has(r.shift))
+        .map((r) => engineers.find((e) => e.id === r.engineer_id))
+        .filter((e): e is Engineer => !!e);
+      for (const type of types) {
+        if (onDuty.length === 0) {
+          gaps.push({ date, base, typeDesignator: type, reason: "no engineers rostered" });
+          continue;
+        }
+        const covered = onDuty.some((e) => checkCertifyingPrivilege(e, type).valid);
+        if (!covered) {
+          const why = onDuty.length
+            ? `on-duty staff cannot certify ${type} (${onDuty
+                .map((e) => `${e.full_name.split(" ")[0]}: ${checkCertifyingPrivilege(e, type).reasons[0] ?? "ok"}`)
+                .join("; ")})`
+            : "no engineers rostered";
+          gaps.push({ date, base, typeDesignator: type, reason: why });
+        }
+      }
+    }
+  }
+  return gaps;
+}
+
+// Licence renewals falling due inside the horizon (default 90 days).
+export function expiringLicences(engineers: Engineer[], horizonDays = 90): { engineer: Engineer; days: number }[] {
+  return engineers
+    .map((e) => ({ engineer: e, days: daysUntil(e.licence_expiry) }))
+    .filter((x): x is { engineer: Engineer; days: number } => x.days !== null && x.days <= horizonDays)
+    .sort((a, b) => a.days - b.days);
 }

@@ -12,6 +12,7 @@ is to show the shape of compliance-aware software, not to claim approval.)
 | **145.A.40** | Tool/test equipment control and calibration to a recognised standard | Tooling register: calibration due dates, recall states; out-of-calibration tools cannot be returned to service |
 | **145.A.42** | Acceptance/segregation of components: certification docs, shelf-life, quarantine, SUP | Parts view: Form 1 refs (missing ones flagged), shelf-life clocks, quarantine segregation with visual isolation |
 | **145.A.65** | Independent quality audit system with corrective-action follow-up | Quality view: audits → findings (Level 1/2/observation) → CAPA; findings cannot close without a recorded corrective action; overdue findings flagged |
+| **145.A.30(d)** | Maintenance man-hour plan showing sufficient staff for planned work | Workforce view: rostered productive hours vs open task-card backlog per base; certifying-coverage gaps (base/day/type with no valid certifier on duty) flagged 7 days ahead |
 | **MMEL/MEL (CAT.IDE / MEL policy)** | Rectification intervals Cat A/B/C/D | `melClock` — live per-defect countdown, breach highlighted fleet-wide |
 | **CAMO.A.315 / M.A.302** | Maintenance programme compliance and forecasting | `mp_tasks` + `mp_compliance` + `mpDue`: FH/FC/calendar limits, whichever-first due list |
 | **M.A.305** | Continuing-airworthiness records: AD status, LLP status, deferred defects | AD/SB view per-tail compliance; LLP consumption tracking with retirement alerts; deferred-defect register |

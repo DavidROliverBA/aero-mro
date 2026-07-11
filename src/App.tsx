@@ -16,11 +16,12 @@ import type {
   MpCompliance,
   MpTask,
   Part,
+  RosterEntry,
   TaskCard,
   Tool,
   WorkOrder,
 } from "./lib/types";
-import { daysUntil, mpDue, toolCheck } from "./lib/compliance";
+import { coverageGaps, daysUntil, mpDue, toolCheck } from "./lib/compliance";
 import Dashboard from "./views/Dashboard";
 import Fleet from "./views/Fleet";
 import TechLog from "./views/TechLog";
@@ -33,6 +34,7 @@ import Directives from "./views/Directives";
 import Reliability from "./views/Reliability";
 import Quality from "./views/Quality";
 import Engineers from "./views/Engineers";
+import Workforce from "./views/Workforce";
 import Assistant from "./views/Assistant";
 
 export interface Store {
@@ -51,6 +53,7 @@ export interface Store {
   llps: LlpComponent[];
   audits: Audit[];
   auditFindings: AuditFinding[];
+  roster: RosterEntry[];
 }
 
 const EMPTY: Store = {
@@ -69,6 +72,7 @@ const EMPTY: Store = {
   llps: [],
   audits: [],
   auditFindings: [],
+  roster: [],
 };
 
 export type Tab =
@@ -84,6 +88,7 @@ export type Tab =
   | "reliability"
   | "quality"
   | "engineers"
+  | "workforce"
   | "assistant";
 
 interface NavItem {
@@ -123,12 +128,13 @@ export default function App() {
         supabase.from("llp_components").select("*").order("part_number"),
         supabase.from("audits").select("*").order("audit_date", { ascending: false }),
         supabase.from("audit_findings").select("*"),
+        supabase.from("roster_entries").select("*").order("duty_date"),
       ]);
       const failed = results.find((r) => r.error);
       if (failed?.error) throw failed.error;
       const [
         aircraft, engineers, defects, parts, workOrders, taskCards, directives, adCompliance,
-        flights, tools, mpTasks, mpCompliance, llps, audits, auditFindings,
+        flights, tools, mpTasks, mpCompliance, llps, audits, auditFindings, roster,
       ] = results;
       setStore({
         aircraft: aircraft.data ?? [],
@@ -146,6 +152,7 @@ export default function App() {
         llps: llps.data ?? [],
         audits: audits.data ?? [],
         auditFindings: auditFindings.data ?? [],
+        roster: roster.data ?? [],
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -195,6 +202,10 @@ export default function App() {
   );
   const toolIssues = store.tools.filter((t) => toolCheck(t).tone === "danger").length;
   const openFindings = store.auditFindings.filter((f) => f.status === "open").length;
+  const rosterGaps = useMemo(
+    () => coverageGaps(store.roster, store.engineers, store.aircraft).length,
+    [store],
+  );
 
   const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     {
@@ -227,6 +238,12 @@ export default function App() {
       items: [
         { id: "reliability", label: "Reliability", icon: "📈" },
         { id: "quality", label: "Quality & Audit", icon: "🛡", badge: openFindings || undefined },
+      ],
+    },
+    {
+      label: "Management",
+      items: [
+        { id: "workforce", label: "Workforce", icon: "👥", badge: rosterGaps || undefined },
       ],
     },
     {
@@ -280,6 +297,7 @@ export default function App() {
       {tab === "reliability" && <Reliability store={store} />}
       {tab === "quality" && <Quality store={store} reload={reload} />}
       {tab === "engineers" && <Engineers store={store} />}
+      {tab === "workforce" && <Workforce store={store} reload={reload} />}
       {tab === "assistant" && (
         <Assistant store={store} reload={reload} keySet={keySet} onNeedKey={handleKey} setTab={go} account={account} />
       )}
