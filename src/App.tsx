@@ -382,7 +382,7 @@ export default function App() {
       {tab === "directives" && <Directives store={store} />}
       {tab === "reliability" && <Reliability store={store} />}
       {tab === "quality" && <Quality store={store} reload={reload} />}
-      {tab === "engineers" && <Engineers store={store} />}
+      {tab === "engineers" && <Engineers store={store} reload={reload} />}
       {tab === "workforce" && <Workforce store={store} reload={reload} />}
       {tab === "settings" && (
         <Settings store={store} reload={reload} keySet={keySet} onSetKey={onSetKey} account={account} />
