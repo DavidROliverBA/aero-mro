@@ -27,7 +27,10 @@ AI at *assistance* level. So AeroMRO's thesis is simple:
 **Live demo:** https://aero-mro.pages.dev (GitHub sign-in required)
 
 > **Demo only.** Fictional airline *Albion Atlantic Airways*. No real
-> operational data. AI outputs are decision-support only.
+> operational data. AI outputs are decision-support only. All features derive
+> from published regulation and public industry sources, and all demo data is
+> fictional — see [`docs/references.md`](docs/references.md) for full
+> provenance.
 
 ## What it does
 
@@ -179,6 +182,8 @@ docs/
   architecture.md     how the pieces fit
   ai-design.md        the UI-vs-AI decision framework
   compliance-map.md   feature → regulation traceability
+  references.md       data provenance + public sources for every idea
+  build-log.md        the session record
 supabase/migrations/  the database, in order (schema → RLS → modules → hardening)
 workers/ai-proxy/     Cloudflare Worker keeping the Claude key server-side
 mcp/                  stdio MCP server + smoke test
