@@ -13,7 +13,7 @@
 │ Supabase (Postgres) │         │ Anthropic API       │
 │ GitHub OAuth · RLS  │         │ claude-opus-4-8     │
 └─────────────────────┘         └─────────────────────┘
-        Deployed to Cloudflare Pages (aero-mro.pages.dev)
+        Deployed to Cloudflare Pages (private URL)
 ```
 
 ## Data model (20 tables)

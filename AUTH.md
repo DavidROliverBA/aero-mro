@@ -31,7 +31,7 @@ Then **Authentication → URL Configuration**:
 
 - **Site URL:** `http://localhost:5173` (swap to the Pages URL once deployed)
 - **Redirect URLs:** add both `http://localhost:5173` and, later,
-  `https://aero-mro.pages.dev` (or your custom domain). The app calls
+  `https://<your-deployment>.pages.dev` (or your custom domain). The app calls
   `signInWithOAuth({ redirectTo: window.location.origin })`, so each origin the
   app is served from must be listed here.
 

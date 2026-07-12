@@ -6,8 +6,8 @@ view-building and finder sweeps, and Opus agents for UX judgment work, with
 Fable doing the research synthesis, architecture, compliance logic, AI layer
 and integration itself. It exists to demonstrate what Fable can do in
 aviation tooling. This log is the record of the session itself: 23 commits over
-2026-07-10 → 2026-07-12, from empty repo to the live system at
-https://aero-mro.pages.dev.
+2026-07-10 → 2026-07-12, from empty repo to a live, privately-deployed
+system.
 
 ## Day 1 — 10 July
 
@@ -69,12 +69,13 @@ https://aero-mro.pages.dev.
 
 ## Where everything stands
 
-- **Live**: https://aero-mro.pages.dev (Cloudflare Pages, `bun run deploy`)
+- **Live**: private Cloudflare Pages deployment (`bun run deploy`; URL not
+  published)
 - **Database**: Supabase `biffxhtytzdcfsbxscwm`, 20 tables, 14+ migrations,
   allow-listed RLS, append-only audit log. `reset_demo_data()` restores the
   full date-shifted demo (preserving added engineers and the user registry).
-- **Accounts**: GitHub OAuth (allow-listed) + username/password. Guest
-  logins `guest1`–`guest5` (password = username) for demonstrations.
+- **Accounts**: GitHub OAuth (allow-listed) + username/password. Demo guest
+  logins exist; credentials are held privately, not in this repo.
 - **AI**: in-app assistant/triage/CRS-drafting/briefing (runtime key, or
   deploy `workers/ai-proxy`); MCP server `mcp/server.ts` for Claude Code
   (`LIVE=1 bun mcp/smoke.ts` to verify).

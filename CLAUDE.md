@@ -1,8 +1,9 @@
 # CLAUDE.md — AeroMRO
 
 AI-native Part-145/CAMO maintenance system demo (fictional "Albion Atlantic
-Airways") built end-to-end by Claude Fable 5. Live: https://aero-mro.pages.dev
-· Supabase project `biffxhtytzdcfsbxscwm` · Repo: DavidROliverBA/aero-mro.
+Airways") built end-to-end by Claude Fable 5. Deployed privately to Cloudflare
+Pages (URL not published; see `bun run deploy` output) · Supabase project
+`biffxhtytzdcfsbxscwm` · Repo: DavidROliverBA/aero-mro.
 
 **Read next when working here:** `docs/architecture.md` (how it fits),
 `docs/ai-design.md` (what may be AI vs must be UI — hold this line),
@@ -62,8 +63,9 @@ deploy `workers/ai-proxy`); `mcp/server.ts` = 12-tool stdio MCP server
 - `reset_demo_data()` (Settings button or `select reset_demo_data()`):
   restores 5 curated hero aircraft + 95 generated (deterministic), 197 damage
   records, photos — preserving user-added engineers and the user registry.
-- Guest logins `guest1`–`guest5` (password = username). Test user
-  `uxtest@aeromro.demo` (creds in `.env.local`) drives the Playwright suites.
+- Demo guest logins exist (credentials held privately by David — not in this
+  repo). Test user `uxtest@aeromro.demo` (creds in `.env.local`) drives the
+  Playwright suites.
 - Adding people: Certifying Staff → Add engineer; Settings → User management
   → create account (optionally engineer-linked → identity-bound sign-offs).
 - `.env.local` is gitignored and holds Supabase URL/key, service key, and

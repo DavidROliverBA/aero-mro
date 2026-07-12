@@ -24,8 +24,10 @@ AI at *assistance* level. So AeroMRO's thesis is simple:
 > explicit human confirmation, and the regulatory acts — sign-off, independent
 > inspection, CRS, deferral, quarantine — have no AI pathway at all.
 
-**Live demo:** https://aero-mro.pages.dev (sign in with an allow-listed
-GitHub account or a username/password created in Settings → User management)
+**Live demo:** a private deployment exists (access on request from the
+maintainer) — or stand up your own instance in ~15 minutes with the guide
+below. Sign-in is allow-listed: a GitHub account or a username/password
+created in Settings → User management.
 
 > **Demo only.** Fictional airline *Albion Atlantic Airways*. No real
 > operational data. AI outputs are decision-support only. All features derive

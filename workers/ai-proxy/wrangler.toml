@@ -10,4 +10,4 @@ compatibility_date = "2026-07-01"
 # in .env.local (and the Pages build env) — the browser never sees the key.
 
 [vars]
-ALLOWED_ORIGIN = "https://aero-mro.pages.dev"
+ALLOWED_ORIGIN = "https://<your-deployment>.pages.dev"

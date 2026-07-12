@@ -10,4 +10,4 @@ history only. Everything it tracked is long done. Current documentation:
 - **[docs/compliance-map.md](docs/compliance-map.md)** — feature → regulation
 - **[docs/path-to-v1.md](docs/path-to-v1.md)** — productionisation plan + progress
 
-Live app: https://aero-mro.pages.dev · Repo: https://github.com/DavidROliverBA/aero-mro
+Repo: https://github.com/DavidROliverBA/aero-mro

@@ -20,7 +20,7 @@ bun run deploy
 
 This runs `bun run build` then `wrangler pages deploy dist --project-name aero-mro`.
 The first deploy creates the `aero-mro` Pages project and prints a
-`https://aero-mro.pages.dev` URL. Re-run it any time to publish an update.
+`https://<your-deployment>.pages.dev` URL. Re-run it any time to publish an update.
 
 ### How env vars work here
 

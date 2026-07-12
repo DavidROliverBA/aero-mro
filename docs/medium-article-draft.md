@@ -21,7 +21,7 @@ it clearly isn't.
 
 ---
 
-There's a live aircraft maintenance system at [aero-mro.pages.dev](https://aero-mro.pages.dev).
+There's a live aircraft maintenance system at [the live demo]([YOUR CALL: link the private deployment, or point readers at the self-hosting guide]).
 It tracks a fleet of 100 aircraft for a fictional airline: defects with live
 MEL rectification clocks, task cards that refuse a release-to-service until
 an independent inspector — a *different* licensed engineer — has signed,
@@ -137,7 +137,7 @@ assistant and the MCP interface without drift.]
 
 ---
 
-*The system is at [aero-mro.pages.dev](https://aero-mro.pages.dev); the
+*The system is at [the live demo]([YOUR CALL: link the private deployment, or point readers at the self-hosting guide]); the
 repository, including the full build log, market research citations and a
 guide to standing up your own instance, is at
 [github.com/DavidROliverBA/aero-mro](https://github.com/DavidROliverBA/aero-mro).*
