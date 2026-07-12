@@ -1,7 +1,11 @@
-# Build log — the two-day session
+# Build log — the session
 
-AeroMRO exists to demonstrate what Claude (Fable 5) can do in aviation
-tooling. This log is the record of the session itself: 23 commits over
+AeroMRO was built end-to-end by **Claude Fable 5** (Anthropic's Mythos-class
+model) working through Claude Code — orchestrating Sonnet agents for parallel
+view-building and finder sweeps, and Opus agents for UX judgment work, with
+Fable doing the research synthesis, architecture, compliance logic, AI layer
+and integration itself. It exists to demonstrate what Fable can do in
+aviation tooling. This log is the record of the session itself: 23 commits over
 2026-07-10 → 2026-07-12, from empty repo to the live system at
 https://aero-mro.pages.dev.
 

@@ -1,5 +1,14 @@
 # AeroMRO ✈
 
+> **Built by [Claude Fable 5](https://www.anthropic.com/news/claude-fable-5-mythos-5)** —
+> this entire system was researched, designed, coded, tested, hardened and
+> deployed by Anthropic's Fable model working through Claude Code over three
+> days: a 9-agent market research sweep, 20-table regulatory data model,
+> 16 modules, an agentic AI layer, an MCP server, 56 automated tests, and
+> ~25 production deployments. The session story, including the six real bugs
+> its own verification layers caught, is in
+> [`docs/build-log.md`](docs/build-log.md).
+
 **An AI-native Maintenance, Repair & Overhaul system** for an airline
 Engineering group, modelled on **UK CAA / EASA Part-145** (Approved
 Maintenance Organisation), **Part-CAMO** (Continuing Airworthiness
