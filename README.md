@@ -4,7 +4,7 @@
 > this entire system was researched, designed, coded, tested, hardened and
 > deployed by Anthropic's Fable model working through Claude Code over three
 > days: a 9-agent market research sweep, 20-table regulatory data model,
-> 16 modules, an agentic AI layer, an MCP server, 56 automated tests, and
+> 18 modules, an agentic AI layer, an MCP server, 56 automated tests, and
 > ~25 production deployments. The session story, including the six real bugs
 > its own verification layers caught, is in
 > [`docs/build-log.md`](docs/build-log.md).
@@ -24,7 +24,8 @@ AI at *assistance* level. So AeroMRO's thesis is simple:
 > explicit human confirmation, and the regulatory acts — sign-off, independent
 > inspection, CRS, deferral, quarantine — have no AI pathway at all.
 
-**Live demo:** https://aero-mro.pages.dev (GitHub sign-in required)
+**Live demo:** https://aero-mro.pages.dev (sign in with an allow-listed
+GitHub account or a username/password created in Settings → User management)
 
 > **Demo only.** Fictional airline *Albion Atlantic Airways*. No real
 > operational data. AI outputs are decision-support only. All features derive
@@ -69,9 +70,12 @@ AI at *assistance* level. So AeroMRO's thesis is simple:
    JSON-schema-constrained output.
 3. **CRS statement drafting** — a Part-145.A.50 release statement from the
    completed task cards, ready for the certifying engineer to review and sign.
+4. **Daily briefing** — one tap on the Dashboard writes the duty manager's
+   morning brief from live data, most urgent first.
 
-See [`docs/ai-design.md`](docs/ai-design.md) for the UI-vs-AI decision
-framework and [`ROADMAP.md`](ROADMAP.md) for the research behind it.
+(The MCP server below is the fifth AI surface.) See
+[`docs/ai-design.md`](docs/ai-design.md) for the UI-vs-AI decision framework
+and [`ROADMAP.md`](ROADMAP.md) for the research behind it.
 
 ### Fast to drive
 
@@ -121,46 +125,24 @@ throughout.
 
 ## Stack
 
-- **Frontend:** Vite + React + TypeScript — run with `bun`, deploy with Wrangler
-- **Backend:** Supabase (Postgres + REST + row-level security + GitHub OAuth)
-- **AI:** Claude (`claude-opus-4-8`) via direct browser `fetch` with a
-  runtime-pasted key
+- **Frontend:** Vite + React + TypeScript — run with `bun`, deploy to
+  Cloudflare Pages with Wrangler
+- **Backend:** Supabase — Postgres (migrations as single source of truth,
+  allow-listed RLS, invariants in triggers/constraints) + Auth (GitHub OAuth
+  and username/password; engineer-linked logins bind sign-offs to identity —
+  see [`AUTH.md`](AUTH.md))
+- **AI:** Claude (`claude-opus-4-8`) — runtime key in Settings (memory-only,
+  never persisted; everything except the ✨ features works without one) or
+  server-side via `workers/ai-proxy`
+- **Testing:** bun test + Playwright + GitHub Actions CI
 
-## Setup
-
-### 1. Database
-
-`supabase/migrations/` is the single source of truth — apply in order via the
-Supabase CLI or MCP. The final state includes RLS restricted to an
-`allowed_users` GitHub allow-list, an append-only audit log, DB-enforced
-invariants (FH/FC roll-up trigger, WO numbering sequence, unique card
-sequence, independent-inspector constraint) and the `reset_demo_data()`
-function.
-
-### 2. Auth
-
-Two ways in, both via Supabase Auth: **GitHub OAuth** (see [`AUTH.md`](AUTH.md))
-or **username + password** accounts created in Settings → User management
-(credentials bcrypt-hashed by GoTrue; usernames map to synthetic
-`@aeromro.demo` emails). Both feed the same `allowed_users` registry that RLS
-checks on every table. Linking an account to an engineer binds My Work and
-task sign-offs to the login identity.
-
-### 3. Run
+## Quick start (existing instance)
 
 ```bash
 bun install
-bun run dev        # http://localhost:5173
-bun run deploy     # Cloudflare Pages (see DEPLOY.md)
+bun run dev        # http://localhost:5173 — .env.local already points at the demo DB
+bun run deploy     # Cloudflare Pages (maintainer only)
 ```
-
-`.env.local` carries the Supabase URL + publishable key (client-safe).
-
-### 4. Enable AI
-
-Click **Set Claude API key** in the sidebar and paste a key (`sk-ant-…`). Held
-in memory only — never persisted. The app is fully usable without it; only the
-✨ features disable.
 
 ## Stand up your own instance
 
