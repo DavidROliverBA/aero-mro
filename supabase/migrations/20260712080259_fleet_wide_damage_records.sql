@@ -1,0 +1,10 @@
+-- Damage records across the whole fleet: seed_damage_and_photos() regenerates
+-- from scratch (idempotent) and now gives every generated aircraft 1-3
+-- deterministic dent & buckle entries — 9 station templates (fuselage LH/RH,
+-- wing skin/LE, belly, fin tip, cargo surround, radome, h-stab), mixed
+-- open/monitor/repaired statuses, ~5% beyond SRM limits. Template index uses
+-- rn*4+k*5 mod 9 (rn coefficient coprime with 9) so all templates occur —
+-- the as-applied migration used rn*3 and was hot-fixed in place immediately
+-- after; the live function matches this file. Full body in remote migration
+-- 20260712080259 + the follow-up function replace. Result: 197 records,
+-- 100/100 aircraft covered, all 9 damage types present, 9 beyond-limits.
