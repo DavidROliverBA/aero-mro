@@ -24,9 +24,11 @@ AI at *assistance* level. So AeroMRO's thesis is simple:
 
 | Module | Regulatory basis | In the app |
 |--------|------------------|-----------|
-| **Dashboard** | — | Fleet posture, a "needs attention" list aggregating every compliance clock, and a one-tap **AI daily briefing** for the duty manager |
-| **My Work** | Part-66 | The engineer's workbench: your cards, inspections waiting on you, your week's roster, licence countdown — sign off without leaving the page |
-| **Fleet** | Part-CAMO | Register, hours/cycles, status, next programme due per tail |
+| **Dashboard** | — | Fleet posture with **drill-down stat tiles**, a "needs attention" list aggregating every compliance clock, and a one-tap **AI daily briefing** for the duty manager |
+| **My Work** | Part-66 | The engineer's workbench: your cards, inspections waiting on you, your week's roster, licence countdown — sign off without leaving the page. **Identity-bound** when your login is linked to an engineer |
+| **Fleet** | Part-CAMO | 100-aircraft register (5 curated + 95 deterministically generated), hours/cycles, status, next programme due — click a tail for its detail panel |
+| **Dent & buckle** | SRM / M.A.305 | Per-aircraft **rendered SVG schematic** with numbered damage markers (dents, lightning strikes, corrosion…), SRM references, within/beyond-limits state, click-to-place recording — 197 records fleet-wide |
+| **Photo library** | records | Real reference photos per tail (seeded from Wikimedia Commons) with an add-photo form |
 | **Tech Log** | 145.A.45 / e-tech-log | Per-sector flight records; closing a sector rolls FH/FC onto the airframe |
 | **Defects** | MEL / MMEL | Defect register with live **MEL rectification clocks** (Cat A/B/C/D) + AI triage |
 | **Work Orders** | 145.A.45(e) / 145.A.48 | Task cards with **per-card sign-off** and **enforced independent inspection** (inspector ≠ signer) |
@@ -39,6 +41,7 @@ AI at *assistance* level. So AeroMRO's thesis is simple:
 | **Quality & Audit** | 145.A.65 | Audits, findings, CAPA tracking; findings can't close without a corrective action |
 | **Certifying Staff** | Part-66 | Licence categories, type ratings, expiry, company authorisation |
 | **Workforce Planning** | 145.A.30 | Duty roster, man-hour plan (capacity vs open backlog per base), **certifying-coverage gap detection**, licence-renewal horizon |
+| **Settings** | — | Dark/light/system theme, Claude key management, **user management** (create/remove logins, engineer linking), one-click **demo data reset** (date-shifted seed, preserves added engineers) |
 
 ### The AI layer (Claude)
 
@@ -60,11 +63,24 @@ framework and [`ROADMAP.md`](ROADMAP.md) for the research behind it.
 
 ### Fast to drive
 
-**⌘K / Ctrl+K** opens a command palette that searches everything — aircraft,
-defects, work orders, parts, tools, staff, ADs, audits — and any query can be
-handed straight to the AI assistant. See [`docs/path-to-v1.md`](docs/path-to-v1.md)
-for the plan (phases, integrations, effort) to take this from demonstration
-to production.
+**⌘K / Ctrl+K or `/`** opens a command palette that searches everything —
+aircraft, defects, work orders, parts, tools, staff, ADs, audits — with
+results deep-linking to the exact record, and any query can be handed straight
+to the AI assistant. **`g` + a letter** jumps to any view (`g x` defects,
+`g w` work orders — press `?` for the full map). Every entity reference in
+every table is a **cross-link** (defect → aircraft → tech log → work order →
+source defect…), and breadcrumbs keep you oriented. See
+[`docs/path-to-v1.md`](docs/path-to-v1.md) for the plan (phases, integrations,
+effort) to take this from demonstration to production.
+
+### Tested
+
+`bun test` runs 42 unit tests over the pure compliance functions;
+`bunx playwright test` runs 14 UX tests (desktop Chrome + iPhone 14 WebKit)
+against a real authenticated session — they've caught genuine bugs, including
+a BST date off-by-one, dead mobile touch-target CSS, and a TRUNCATE CASCADE
+that wiped the sign-in allow-list. GitHub Actions CI runs tests + build on
+every push.
 
 ### MCP server — drive it from Claude Code
 
@@ -136,13 +152,15 @@ in memory only — never persisted. The app is fully usable without it; only the
 
 ## Security notes
 
-- The publishable Supabase key is client-safe; RLS policies restrict every
-  table to the `authenticated` role (see `supabase/migrations/…lock_rls…`).
-- Browser-direct Anthropic calls expose the pasted key to the client —
-  acceptable for a single-user demo. Production would proxy via a Cloudflare
-  Worker (Tier 3 in the roadmap).
-- Any GitHub account can currently sign in; restricting to named users is a
-  documented next step in `AUTH.md`.
+- **Allow-listed access**: RLS on every table requires membership in
+  `allowed_users` (checked against the JWT username), not just authentication.
+  The **audit log is append-only** — no update/delete policies exist.
+- **Invariants live in Postgres**: FH/FC roll-up trigger, WO-number sequence,
+  unique card sequence, inspector ≠ signer constraint — enforced identically
+  for the app, the MCP server, and any future client.
+- The Claude key is entered at runtime and held in memory; for zero
+  browser exposure, deploy `workers/ai-proxy` and set `VITE_AI_PROXY_URL`.
+- The publishable Supabase key is client-safe by design.
 
 ## Project layout
 
@@ -164,5 +182,6 @@ src/
     ai.ts             Claude: triage, CRS drafting, agentic tool-use assistant
     actions.ts        snapshot builder + confirmed-action executor (audit-logged)
   views/              one file per module
-  components/ui.tsx   pills, stat cards, life bars
+  components/         ui.tsx (pills, stat cards, life bars, entity links),
+                      CommandPalette.tsx, DamageSchematic.tsx (SVG dent & buckle)
 ```

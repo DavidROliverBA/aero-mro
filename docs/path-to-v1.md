@@ -31,6 +31,21 @@ data loading, browser-held AI key, no offline mode, no printable outputs.
 
 ---
 
+## Progress since writing (2026-07-11/12)
+
+Several Phase 1 workstreams are already partly delivered in the demo:
+**identity** — username/password accounts on Supabase Auth, allow-listed RLS,
+engineer-linked logins binding My Work sign-offs to the authenticated person;
+**DB-enforced invariants** — FH/FC roll-up trigger, WO-number sequence, unique
+card sequence, inspector ≠ signer constraint, append-only audit log;
+**AI hardening** — the Cloudflare Worker proxy exists in-repo (undeployed);
+**tests/CI** — 42 unit tests over the compliance functions, 14 Playwright UX
+tests (desktop + iPhone) against authenticated sessions, GitHub Actions CI.
+Also landed beyond the original plan: a 100-aircraft generated fleet, dent &
+buckle charts on rendered schematics, an aircraft photo library, and an MCP
+server exposing the system as 12 compliance-aware tools. The remaining
+Phase 1 estimates below should be read net of this progress.
+
 ## Phase 1 — v1: credible pilot (target: one 5–50-tail CAMO/AMO)
 
 The version you could put in front of a real (friendly) organisation for a

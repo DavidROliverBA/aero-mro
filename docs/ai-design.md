@@ -11,7 +11,7 @@ to Level 1 (assistance) and Level 2 (human-AI teaming), with mandatory human
 oversight and explainability. AeroMRO doesn't treat that as a constraint to
 work around; it's the design.
 
-## The three AI surfaces
+## The AI surfaces
 
 ### 1. Agentic assistant (`src/views/Assistant.tsx`)
 
@@ -21,7 +21,8 @@ A tool-use conversation loop (`agentTurn` in `src/lib/ai.ts`):
   `buildSnapshot` in `src/lib/actions.ts`) in its system prompt — questions are
   answered with zero round-trips and it cannot invent records it can't see.
 - It may call **action tools**: `create_defect`, `create_work_order`,
-  `add_task_card`, `record_flight`, `update_aircraft_status`, `navigate`.
+  `add_task_card`, `record_flight`, `update_aircraft_status`, `set_roster`
+  (rostering is a management act, so it's AI-proposable), `navigate`.
 - `navigate` is the only auto-executing tool (pure UI, harmless). Every other
   tool call renders as a **pending action card**: the human reads a plain-
   English description and clicks *Confirm & execute* or *Decline*. Only then
@@ -50,6 +51,22 @@ Drafts the 145.A.50 release statement from the completed task cards. The
 certifying engineer edits and signs; the licence/type-rating/authorisation
 gate (`checkCertifyingPrivilege`) and the sign-off completeness gate
 (`crsBlockers`) are deterministic code that no AI output can bypass.
+
+### 4. Daily briefing (`dailyBrief`)
+
+One tap on the Dashboard produces the duty manager's morning brief from the
+live snapshot — AOG and what unblocks it, clocks near breach, coverage gaps —
+most urgent first. Read-only narrative; nothing to confirm.
+
+### 5. The MCP server (`mcp/server.ts`)
+
+The same system exposed to any MCP client (e.g. Claude Code) as 12 typed
+tools importing the identical `src/lib/compliance.ts` functions — one source
+of regulatory truth across UI, in-app assistant, and MCP. The same red lines
+apply (no sign-off/CRS/deferral/quarantine tools); writes are audit-logged as
+`MCP (Claude Code)` and the MCP client's permission prompt is the
+human-confirmation step. The ⌘K command palette also hands free-text queries
+to the in-app assistant, which auto-sends on arrival.
 
 ## The decision table
 
