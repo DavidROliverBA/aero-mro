@@ -128,8 +128,14 @@ const G_SHORTCUTS: Record<string, Tab> = {
 export default function App() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [store, setStore] = useState<Store>(EMPTY);
+  // Mirrors `store` but is written synchronously by reload(). The assistant's
+  // follow-up turn runs in the microtask right after `await reload()` — before
+  // React has committed the new store — so it must read the fresh data here.
+  const storeRef = useRef<Store>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Which user's data `store` holds — null until a load completes for this session.
+  const [loadedUid, setLoadedUid] = useState<string | null>(null);
   const [keySet, setKeySet] = useState(hasApiKey());
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -217,7 +223,7 @@ export default function App() {
         flights, tools, mpTasks, mpCompliance, llps, audits, auditFindings, roster, allowedUsers,
         damage, photos,
       ] = results;
-      setStore({
+      const next: Store = {
         aircraft: aircraft.data ?? [],
         engineers: engineers.data ?? [],
         defects: defects.data ?? [],
@@ -239,9 +245,17 @@ export default function App() {
         photos: photos.data ?? [],
         aircraftById: new Map((aircraft.data ?? []).map((a: Aircraft) => [a.id, a])),
         engineersById: new Map((engineers.data ?? []).map((e: Engineer) => [e.id, e])),
-      });
+      };
+      storeRef.current = next;
+      setStore(next);
+      // Records WHOSE data this is. The authorisation screen must not fire on a
+      // store that simply hasn't loaded yet, or a legitimate user sees "Not
+      // authorised" flash between sign-in and the first fetch.
+      const { data: sess } = await supabase.auth.getSession();
+      setLoadedUid(sess.session?.user.id ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      setLoadedUid(null);
     } finally {
       setLoading(false);
     }
@@ -374,7 +388,33 @@ export default function App() {
   }
   if (!session) return <Login />;
 
-  const account = session.user.user_metadata?.user_name ?? session.user.email ?? "signed in";
+  // Authorisation keys on the authenticated identity, never on user_metadata —
+  // that claim is client-writable, so matching on it would let any signed-in user
+  // grant themselves access. RLS enforces the same rule server-side; this is the
+  // UI half, so a stranger gets a refusal rather than a plausible-looking empty app.
+  const me = store.allowedUsers.find((u) => u.user_id === session.user.id) ?? null;
+  const isAdmin = me?.is_admin ?? false;
+  const account = me?.username ?? session.user.user_metadata?.user_name ?? session.user.email ?? "signed in";
+
+  // Only refuse once the allow-list has actually been fetched FOR THIS uid — never
+  // on an empty store that is merely still loading, and never when the fetch failed
+  // (that gets the data-error banner instead).
+  if (!error && loadedUid === session.user.id && !me) {
+    return (
+      <div className="app">
+        <main className="main">
+          <div className="panel" style={{ maxWidth: 460, margin: "4rem auto", textAlign: "center" }}>
+            <h2>Not authorised</h2>
+            <p className="muted">
+              You are signed in as {session.user.email ?? "an unknown account"}, but that account is not on
+              the AeroMRO access list. Ask the administrator to add you.
+            </p>
+            <button className="btn" onClick={() => void supabase.auth.signOut()}>Sign out</button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   const currentGroup = NAV_GROUPS.find((g) => g.items.some((i) => i.id === tab));
   const currentItem = ALL_ITEMS.find((i) => i.id === tab);
@@ -396,19 +436,7 @@ export default function App() {
       {tab === "engineers" && <Engineers store={store} reload={reload} />}
       {tab === "workforce" && <Workforce store={store} reload={reload} />}
       {tab === "settings" && (
-        <Settings store={store} reload={reload} keySet={keySet} onSetKey={onSetKey} account={account} />
-      )}
-      {tab === "assistant" && (
-        <Assistant
-          store={store}
-          reload={reload}
-          keySet={keySet}
-          onNeedKey={handleKey}
-          setTab={go}
-          account={account}
-          seed={askSeed}
-          onSeedConsumed={() => setAskSeed(null)}
-        />
+        <Settings store={store} reload={reload} keySet={keySet} onSetKey={onSetKey} account={account} isAdmin={isAdmin} />
       )}
     </>
   );
@@ -492,6 +520,21 @@ export default function App() {
           </div>
         )}
         {loading ? <p className="spinner" role="status">Loading fleet data…</p> : view}
+        {/* Rendered on every tab, outside the conditional chain above: the assistant's
+            own navigate tool switches tabs mid-turn, and unmounting it there would
+            destroy the transcript, the tool_use/tool_result history and any pending
+            action cards. When inactive it renders nothing at all (no hidden DOM). */}
+        <Assistant
+          active={tab === "assistant"}
+          storeRef={storeRef}
+          reload={reload}
+          keySet={keySet}
+          onNeedKey={handleKey}
+          setTab={go}
+          account={account}
+          seed={askSeed}
+          onSeedConsumed={() => setAskSeed(null)}
+        />
       </main>
 
       {/* Mobile floating search/AI action — thumb-reachable, unlike the header */}

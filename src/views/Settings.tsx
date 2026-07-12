@@ -16,12 +16,14 @@ export default function Settings({
   keySet,
   onSetKey,
   account,
+  isAdmin,
 }: {
   store: Store;
   reload: () => Promise<void>;
   keySet: boolean;
   onSetKey: (k: string) => void;
   account: string;
+  isAdmin: boolean;
 }) {
   const [theme, setTheme] = useState<ThemePref>(getThemePref());
   const [resetting, setResetting] = useState(false);
@@ -37,7 +39,9 @@ export default function Settings({
   const [myPass, setMyPass] = useState("");
   const [passMsg, setPassMsg] = useState<string | null>(null);
 
-  const me = store.allowedUsers.find((u) => u.username === account);
+  // `account` is resolved from the allow-list row bound to the authenticated uid
+  // (App.tsx), so this matches identity, not a self-assertable metadata claim.
+  const me = store.allowedUsers.find((u) => u.username === account) ?? null;
 
   async function createUser() {
     setUserBusy("create");
@@ -173,6 +177,17 @@ export default function Settings({
         </p>
       </fieldset>
 
+      {!isAdmin && (
+        <fieldset>
+          <legend>User management</legend>
+          <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            Creating and removing accounts, and resetting the demo data, are restricted to
+            administrators. You are signed in as <strong>{account}</strong>.
+          </p>
+        </fieldset>
+      )}
+
+      {isAdmin && (
       <fieldset>
         <legend>User management</legend>
         <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
@@ -265,6 +280,7 @@ export default function Settings({
           </div>
         )}
       </fieldset>
+      )}
 
       {me?.auth_kind === "password" && (
         <fieldset>
@@ -292,6 +308,7 @@ export default function Settings({
         </fieldset>
       )}
 
+      {isAdmin && (
       <fieldset style={{ borderColor: "var(--danger)" }}>
         <legend style={{ color: "var(--danger)" }}>Demo controls</legend>
         <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
@@ -312,6 +329,7 @@ export default function Settings({
           </div>
         )}
       </fieldset>
+      )}
 
       <p className="muted" style={{ fontSize: 12 }}>
         Signed-in account and sign-out live in the sidebar. Demo persona for the My Work

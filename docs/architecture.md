@@ -60,8 +60,13 @@ preserving user-added engineers and the sign-in registry.
 - **Responsive shell, not a separate app.** Same components; CSS swaps the
   sidebar for a bottom tab bar + "More" sheet under 768 px, with safe-area
   insets and 44 pt targets. No local state is lost switching form factors.
-- **RLS everywhere.** Every table has a single `auth_all` policy scoped to
-  `authenticated`; anonymous REST reads return nothing.
+- **RLS everywhere, keyed on identity.** Every table has a single policy scoped to
+  `authenticated` and gated on `is_allowed()`, which matches `auth.uid()` against
+  `allowed_users.user_id`. It deliberately does *not* read the JWT's
+  `user_metadata` — that claim is client-writable, and when `is_allowed()` trusted
+  it, any signed-in user could self-grant full access. Admin acts (user management,
+  demo reset) additionally require `is_admin()`. Anonymous reads return nothing, and
+  no `security definer` function is callable by `anon`.
 
 ## Known demo shortcuts
 

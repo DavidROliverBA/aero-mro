@@ -34,6 +34,17 @@ bun run deploy              # Cloudflare Pages (--force baked in) — get David'
 - **Never update `aircraft.total_hours/total_cycles` in app code** — the
   `trg_roll_flight` trigger owns the FH/FC roll-up. Same for `wo_number`
   (DB sequence default) and card sequences (unique constraint).
+- **Authorisation keys on `auth.uid()`, never on JWT metadata.** `user_metadata`
+  is client-writable (`auth.updateUser()`), so `is_allowed()` once let any signed-in
+  user self-grant full access. `allowed_users.user_id` is the identity; the username
+  is a display name. Same rule in the client — match on `user_id`, not `username`.
+- **`revoke ... from public` does NOT remove Supabase's grants.** Default privileges
+  grant EXECUTE to `anon`/`authenticated` *explicitly*, so `anon` must be named in
+  the revoke. Three `security definer` reset helpers were callable unauthenticated
+  via PostgREST RPC with the publishable key — an anonymous TRUNCATE of the DB.
+  Any new `security definer` function: `revoke all ... from public, anon;` and grant
+  back only what needs it. Admin-only acts gate on `is_admin()` (which passes for
+  `service_role`, so the MCP server keeps working).
 - **Local dates**: use `localIso`/`localIsoOffset` from `src/lib/compliance.ts`,
   never `toISOString().slice(0,10)` after local-date arithmetic (BST off-by-one).
 - **Mobile CSS**: the touch-target media block at the END of `styles.css` must
@@ -65,7 +76,9 @@ deploy `workers/ai-proxy`); `mcp/server.ts` = 12-tool stdio MCP server
   records, photos — preserving user-added engineers and the user registry.
 - Demo guest logins exist (credentials held privately by David — not in this
   repo). Test user `uxtest@aeromro.demo` (creds in `.env.local`) drives the
-  Playwright suites.
+  Playwright suites. Guests are **non-admin**: no user management, no demo reset.
+  `DavidROliverBA` is the only admin (`allowed_users.is_admin`); grant another via
+  SQL/service key — there is deliberately no in-app path to self-promote.
 - Adding people: Certifying Staff → Add engineer; Settings → User management
   → create account (optionally engineer-linked → identity-bound sign-offs).
 - `.env.local` is gitignored and holds Supabase URL/key, service key, and

@@ -208,6 +208,10 @@ export interface RosterEntry {
 
 export interface AllowedUser {
   username: string;
+  // The authenticated identity. Authorisation keys on this, never on the
+  // username or JWT metadata (which the user can rewrite).
+  user_id: string | null;
+  is_admin: boolean;
   engineer_id: string | null;
   auth_kind: "github" | "password";
   added_at: string;

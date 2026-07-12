@@ -358,7 +358,11 @@ export default function Dashboard({
                     <td>{c.label}</td>
                     <td>{ac?.registration}</td>
                     <td className="muted">{d.description}</td>
-                    <td><Pill tone="danger">{Math.abs(c.daysRemaining ?? 0)}d overdue</Pill></td>
+                    <td>
+                      <Pill tone="danger">
+                        {c.daysRemaining === null ? "no deadline" : `${Math.abs(c.daysRemaining)}d overdue`}
+                      </Pill>
+                    </td>
                   </tr>
                 );
               })}

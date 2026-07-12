@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { Store, Tab } from "../App";
 import { supabase } from "../lib/supabase";
+import { logAudit } from "../lib/audit";
 import { triageDefect, type TriageResult } from "../lib/ai";
-import { melClock } from "../lib/compliance";
+import { melClock, MEL_MAX_DAYS, localIsoOffset } from "../lib/compliance";
 import { EntityLink, Pill } from "../components/ui";
 
 export default function Defects({
@@ -48,26 +49,28 @@ export default function Defects({
     setBusy("save");
     setErr(null);
     try {
-      const deferred = triage && triage.suggested_mel_cat !== "none" && !triage.aog_risk;
-      const melDays = triage
-        ? { A: 0, B: 3, C: 10, D: 120 }[triage.suggested_mel_cat as "A" | "B" | "C" | "D"]
-        : undefined;
-      const deferredUntil =
-        deferred && melDays !== undefined
-          ? new Date(Date.now() + melDays * 86400000).toISOString().slice(0, 10)
-          : null;
+      const melCat =
+        triage && triage.suggested_mel_cat !== "none" ? triage.suggested_mel_cat : null;
+      const deferred = !!melCat && !triage!.aog_risk;
+      const deferredUntil = deferred ? localIsoOffset(MEL_MAX_DAYS[melCat!]) : null;
       const { error } = await supabase.from("defects").insert({
         aircraft_id: ac.id,
         raised_by: raisedBy || "Unattributed",
         description: desc,
         ata_chapter: triage?.ata_chapter ?? null,
-        mel_cat: deferred ? triage?.suggested_mel_cat : null,
+        mel_cat: deferred ? melCat : null,
         severity: triage?.severity ?? "minor",
         status: deferred ? "deferred" : "open",
         deferred_until: deferredUntil,
         ai_triaged: !!triage,
       });
       if (error) throw error;
+      await logAudit(
+        "defects",
+        "Defect raised",
+        raisedBy.trim() || "Unattributed",
+        `${ac.registration}: ${desc.trim().slice(0, 80)}${deferred ? ` — deferred MEL Cat ${triage?.suggested_mel_cat}` : ""}`,
+      );
       setDesc("");
       setRaisedBy("");
       setTriage(null);
@@ -191,9 +194,11 @@ export default function Defects({
                     <td>
                       {clock ? (
                         <Pill tone={clock.tone}>
-                          {clock.daysRemaining !== null && clock.daysRemaining < 0
-                            ? `${Math.abs(clock.daysRemaining)}d overdue`
-                            : `${clock.daysRemaining}d left`}
+                          {clock.daysRemaining === null
+                            ? "no deadline"
+                            : clock.daysRemaining < 0
+                              ? `${Math.abs(clock.daysRemaining)}d overdue`
+                              : `${clock.daysRemaining}d left`}
                         </Pill>
                       ) : (
                         <span className="muted">—</span>
@@ -242,9 +247,11 @@ export default function Defects({
                 </Pill>
                 {clock && (
                   <Pill tone={clock.tone}>
-                    {clock.daysRemaining !== null && clock.daysRemaining < 0
-                      ? `${Math.abs(clock.daysRemaining)}d overdue`
-                      : `${clock.daysRemaining}d left`}
+                    {clock.daysRemaining === null
+                      ? "no deadline"
+                      : clock.daysRemaining < 0
+                        ? `${Math.abs(clock.daysRemaining)}d overdue`
+                        : `${clock.daysRemaining}d left`}
                   </Pill>
                 )}
                 {wo && (

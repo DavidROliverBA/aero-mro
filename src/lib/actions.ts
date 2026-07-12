@@ -4,6 +4,7 @@
 
 import { supabase } from "./supabase";
 import { logAudit } from "./audit";
+import { localIso } from "./compliance";
 import type { ProposedAction } from "./ai";
 import type { Engineer, TaskCard } from "./types";
 import type { Store } from "../App";
@@ -26,7 +27,7 @@ export function buildSnapshot(store: Store): string {
 
 function computeSnapshot(store: Store): string {
   return JSON.stringify({
-    today: new Date().toISOString().slice(0, 10),
+    today: localIso(new Date()),
     aircraft: store.aircraft.map((a) => ({
       reg: a.registration, type: a.type_designator, status: a.status, base: a.base,
       fh: a.total_hours, fc: a.total_cycles, next_check: a.next_check_type, next_check_due: a.next_check_due,

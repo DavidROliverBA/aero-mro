@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { Store, Tab } from "../App";
 import { supabase } from "../lib/supabase";
 import { logAudit } from "../lib/audit";
+import { localIsoOffset } from "../lib/compliance";
 import { EntityLink, Pill, StatCard, EmptyState } from "../components/ui";
 
 export default function TechLog({
@@ -23,7 +24,7 @@ export default function TechLog({
   // Record-sector form state
   const [formAircraftId, setFormAircraftId] = useState("");
   const [flightNo, setFlightNo] = useState("");
-  const [flightDate, setFlightDate] = useState(new Date().toISOString().slice(0, 10));
+  const [flightDate, setFlightDate] = useState(localIsoOffset(0));
   const [dep, setDep] = useState("");
   const [arr, setArr] = useState("");
   const [blockHours, setBlockHours] = useState("");
@@ -32,9 +33,7 @@ export default function TechLog({
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 7);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const cutoffStr = localIsoOffset(-7);
 
   const openSectors = store.flights.filter((f) => f.status === "open").length;
   const recentFlights = useMemo(
@@ -78,7 +77,7 @@ export default function TechLog({
   function resetForm() {
     setFormAircraftId("");
     setFlightNo("");
-    setFlightDate(new Date().toISOString().slice(0, 10));
+    setFlightDate(localIsoOffset(0));
     setDep("");
     setArr("");
     setBlockHours("");

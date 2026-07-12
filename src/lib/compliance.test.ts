@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import {
   cardGate,
   checkCertifyingPrivilege,
@@ -180,6 +180,48 @@ describe("daysUntil", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// daysUntil — injected-clock / timezone regression coverage.
+//
+// These tests pin process.env.TZ to Europe/London so behaviour doesn't
+// depend on the host running the suite. Bun (like Node) re-reads TZ on each
+// Date construction, so flipping it per-test and restoring afterwards is
+// safe and doesn't leak into other describe blocks.
+// ---------------------------------------------------------------------------
+
+describe("daysUntil with injected clock (BST/GMT correctness)", () => {
+  const originalTz = process.env.TZ;
+  afterEach(() => {
+    if (originalTz === undefined) delete process.env.TZ;
+    else process.env.TZ = originalTz;
+  });
+
+  test("00:30 BST local midnight → today's own date is 0, not 1", () => {
+    process.env.TZ = "Europe/London";
+    // 2026-06-15T00:30 local (BST, UTC+1) is 2026-06-14T23:30Z — the old
+    // UTC-slice implementation would read "today" as the 14th and return 1.
+    const now = new Date("2026-06-15T00:30:00+01:00");
+    expect(daysUntil("2026-06-15", now)).toBe(0);
+  });
+
+  test("00:30 GMT (winter, no UTC offset) local midnight → today's own date is 0", () => {
+    process.env.TZ = "Europe/London";
+    const now = new Date("2026-01-15T00:30:00Z");
+    expect(daysUntil("2026-01-15", now)).toBe(0);
+  });
+
+  test("120-day MEL Cat D horizon crossing the October BST→GMT switch still returns 120", () => {
+    process.env.TZ = "Europe/London";
+    // 2026-08-01 is BST; +120 calendar days lands on 2026-11-29, which is
+    // GMT — the clocks go back on 2026-10-25. Compute the target from `now`
+    // itself (via localIso) so the test doesn't depend on a hardcoded date.
+    const now = new Date("2026-08-01T09:00:00+01:00");
+    const target = new Date(now);
+    target.setDate(target.getDate() + 120);
+    expect(daysUntil(localIso(target), now)).toBe(120);
+  });
+});
+
 describe("localIsoOffset", () => {
   test("returns YYYY-MM-DD format", () => {
     expect(localIsoOffset(0)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -223,6 +265,20 @@ describe("melClock", () => {
     expect(result).not.toBeNull();
     expect(result!.breached).toBe(true);
     expect(result!.tone).toBe("danger");
+  });
+
+  test("deferred Cat B with no deferred_until date → NOT ok (must not read as healthy)", () => {
+    const defect = makeDefect({
+      status: "deferred",
+      mel_cat: "B",
+      deferred_until: null,
+    });
+    const result = melClock(defect);
+    expect(result).not.toBeNull();
+    expect(result!.tone).not.toBe("ok");
+    expect(result!.tone).toBe("danger");
+    expect(result!.daysRemaining).toBeNull();
+    expect(result!.label.toLowerCase()).toContain("no rectification deadline");
   });
 });
 
@@ -311,6 +367,42 @@ describe("mpDue", () => {
     const result = mpDue(task, c, ac);
     expect(result.limitingLabel).not.toBe("no limit data");
     expect(result.tone).toBe("danger");
+  });
+
+  test("FC-limited task overdue → danger, label mentions FC", () => {
+    const task = makeMpTask({ interval_fc: 100 });
+    const c = makeMpCompliance({ last_done_fc: 0 });
+    const ac = makeAircraft({ total_cycles: 150 }); // remainingFc = 0 + 100 - 150 = -50
+    const result = mpDue(task, c, ac);
+    expect(result.remainingFc).toBe(-50);
+    expect(result.tone).toBe("danger");
+    expect(result.limitingLabel).toContain("FC");
+  });
+
+  test("interval_fh set but task never performed (last_done_fh null) → NOT ok", () => {
+    const task = makeMpTask({ interval_fh: 500 });
+    const c = makeMpCompliance(); // last_done_fh/fc/date all null — never recorded
+    const ac = makeAircraft({ total_hours: 10 }); // well within any plausible interval
+    const result = mpDue(task, c, ac);
+    expect(result.tone).not.toBe("ok");
+    expect(result.limitingLabel).not.toBe("no limit data");
+  });
+
+  test("interval_fc set but task never performed (last_done_fc null) → NOT ok", () => {
+    const task = makeMpTask({ interval_fc: 500 });
+    const c = makeMpCompliance();
+    const ac = makeAircraft({ total_cycles: 10 });
+    const result = mpDue(task, c, ac);
+    expect(result.tone).not.toBe("ok");
+  });
+
+  test("task with no intervals at all → still ok / 'no limit data'", () => {
+    const task = makeMpTask(); // interval_fh/fc/days all null
+    const c = makeMpCompliance();
+    const ac = makeAircraft();
+    const result = mpDue(task, c, ac);
+    expect(result.tone).toBe("ok");
+    expect(result.limitingLabel).toBe("no limit data");
   });
 });
 

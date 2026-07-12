@@ -30,15 +30,21 @@ export function localIsoOffset(offsetDays: number): string {
   return localIso(d);
 }
 
-export function daysUntil(dateStr: string | null): number | null {
+// `now` is injectable for testing; defaults to the real clock so every
+// existing call site keeps working unchanged. Must use localIso(now), not
+// now.toISOString().slice(0,10) — the latter renders UTC and shifts local
+// midnight back a day on UTC+ timezones (e.g. BST), see CLAUDE.md.
+export function daysUntil(dateStr: string | null, now: Date = new Date()): number | null {
   if (!dateStr) return null;
   const target = new Date(dateStr + "T00:00:00").getTime();
-  const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
+  const today = new Date(localIso(now) + "T00:00:00").getTime();
   return Math.round((target - today) / DAY);
 }
 
 // MMEL rectification interval maximums (calendar days) per EASA/CAA MEL categories.
-export const MEL_MAX_DAYS: Record<string, number> = { A: 0, B: 3, C: 10, D: 120 };
+// Keyed on the category union, not string: Record<string, number> would let
+// MEL_MAX_DAYS["none"] typecheck and hand back undefined at runtime.
+export const MEL_MAX_DAYS: Record<"A" | "B" | "C" | "D", number> = { A: 0, B: 3, C: 10, D: 120 };
 
 export interface MelClock {
   label: string;
@@ -50,8 +56,20 @@ export interface MelClock {
 export function melClock(defect: Defect): MelClock | null {
   if (defect.status !== "deferred" || !defect.mel_cat) return null;
   const d = daysUntil(defect.deferred_until);
-  const breached = d !== null && d < 0;
-  const tone: MelClock["tone"] = breached ? "danger" : d !== null && d <= 3 ? "warn" : "ok";
+  // A deferral with no rectification deadline is not "healthy" — it's an
+  // untracked MEL clock, which is worse than one that's merely close to
+  // breach. Treat it as an active breach so it still shows up on the danger
+  // radar (dashboard + defects list) instead of silently reading green.
+  if (d === null) {
+    return {
+      label: `MEL Cat ${defect.mel_cat} (max ${MEL_MAX_DAYS[defect.mel_cat]}d) — NO RECTIFICATION DEADLINE SET`,
+      daysRemaining: null,
+      breached: true,
+      tone: "danger",
+    };
+  }
+  const breached = d < 0;
+  const tone: MelClock["tone"] = breached ? "danger" : d <= 3 ? "warn" : "ok";
   return {
     label: `MEL Cat ${defect.mel_cat} (max ${MEL_MAX_DAYS[defect.mel_cat]}d)`,
     daysRemaining: d,
@@ -151,10 +169,22 @@ export function mpDue(task: MpTask, c: MpCompliance, ac: Aircraft): DueItem {
   margins.sort((a, b) => a.norm - b.norm);
   const limiting = margins[0];
 
+  // A task with at least one interval defined but no matching last-done value
+  // has never been recorded as performed — that's an unrecorded compliance
+  // gap, not "no limit data" (which is reserved for tasks with no intervals
+  // at all). We can't prove compliance, so treat it as "danger" rather than
+  // "warn": in a safety-critical MRO system, unproven compliance must default
+  // to the worst case, not sit one severity level above a clean green "ok".
+  const hasAnyInterval = task.interval_fh !== null || task.interval_fc !== null || task.interval_days !== null;
+  const neverRecorded =
+    hasAnyInterval && c.last_done_fh === null && c.last_done_fc === null && !c.last_done_date;
+
   let tone: Tone = "ok";
   if (limiting) {
     if (limiting.norm < 0) tone = "danger";
     else if (limiting.norm <= 0.1) tone = "warn";
+  } else if (neverRecorded) {
+    tone = "danger";
   }
   return {
     task,
@@ -164,7 +194,7 @@ export function mpDue(task: MpTask, c: MpCompliance, ac: Aircraft): DueItem {
     remainingFc,
     remainingDays,
     dueDate,
-    limitingLabel: limiting ? limiting.label : "no limit data",
+    limitingLabel: limiting ? limiting.label : neverRecorded ? "never recorded — compliance unknown" : "no limit data",
     tone,
   };
 }

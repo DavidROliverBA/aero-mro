@@ -28,8 +28,13 @@ const SUGGESTIONS = [
   "Any compliance risks I should know about this morning?",
 ];
 
+// Model turns chained on auto-executed tools alone (no human input between
+// them) before we stop and hand control back to the user.
+const MAX_AUTO_TURNS = 5;
+
 export default function Assistant({
-  store,
+  active,
+  storeRef,
   reload,
   keySet,
   onNeedKey,
@@ -38,7 +43,8 @@ export default function Assistant({
   seed,
   onSeedConsumed,
 }: {
-  store: Store;
+  active: boolean;
+  storeRef: { current: Store };
   reload: () => Promise<void>;
   keySet: boolean;
   onNeedKey: () => void;
@@ -68,22 +74,28 @@ export default function Assistant({
   }
 
   // A query handed over from the command palette: send it straight away if a
-  // key is set, otherwise pre-fill the input so nothing is lost.
+  // key is set, otherwise pre-fill the input so nothing is lost. The palette is
+  // global, so a seed can arrive while this view is already open — it must fire
+  // on every new seed, not only on mount.
   useEffect(() => {
-    if (seed) {
-      onSeedConsumed?.();
-      if (keySet) void send(seed);
-      else setInput(seed);
-    }
+    if (!seed) return;
+    onSeedConsumed?.();
+    if (keySet && !busy && !hasPending) void send(seed);
+    else setInput(seed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [seed]);
 
-  async function runTurn() {
+  async function runTurn(depth = 0) {
     setBusy(true);
     try {
-      const turn = await agentTurn(history.current, buildSnapshot(store));
+      const turn = await agentTurn(history.current, buildSnapshot(storeRef.current));
       history.current.push({ role: "assistant", content: turn.assistantBlocks });
       if (turn.text) push({ kind: "assistant", text: turn.text });
+      if (turn.stopReason === "max_tokens")
+        push({
+          kind: "system",
+          text: "The reply was cut short at the response length limit — ask for the rest, or narrow the question.",
+        });
 
       if (turn.actions.length === 0) return;
 
@@ -101,9 +113,24 @@ export default function Assistant({
         }
       }
       if (pendingCount === 0) {
-        // Everything auto-executed — let the model finish its answer.
+        // Everything auto-executed — let the model finish its answer. The results
+        // must go back even when the budget is spent: a tool_use block left
+        // without its tool_result would corrupt the history for the next message.
         history.current.push({ role: "user", content: results });
-        await runTurn();
+        if (depth + 1 >= MAX_AUTO_TURNS) {
+          // Close the turn with an assistant message: leaving the transcript on a
+          // user turn would make the next send() two consecutive user messages.
+          history.current.push({
+            role: "assistant",
+            content: [{ type: "text", text: "[Stopped: automatic step limit reached.]" }],
+          });
+          push({
+            kind: "system",
+            text: `Stopped after ${MAX_AUTO_TURNS} automatic steps without an answer — send another message to continue.`,
+          });
+          return;
+        }
+        await runTurn(depth + 1);
       } else {
         // Hold auto results until the pending cards resolve, then send together.
         autoResults.current = results;
@@ -125,7 +152,7 @@ export default function Assistant({
     let result: string;
     if (approved) {
       try {
-        result = await executeAction(item.action, store, account);
+        result = await executeAction(item.action, storeRef.current, account);
         await reload();
       } catch (e) {
         state = "error";
@@ -177,6 +204,11 @@ export default function Assistant({
     history.current.push({ role: "user", content: q });
     await runTurn();
   }
+
+  // Mounted on every tab (App keeps the session alive across navigation) but
+  // renders nothing when another view is showing — no hidden DOM, so nothing
+  // here is focusable, announced, or matched by a query on the visible view.
+  if (!active) return null;
 
   return (
     <>

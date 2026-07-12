@@ -67,6 +67,41 @@ system.
   the distribution check and fixed).
 - **Docs catch-up** (`f3b19bc`) and this log.
 
+## Day 4 — 12 July (the audit)
+
+A five-agent review swept the repo (architecture, security, product, testing,
+UX). It found the two worst bugs of the whole build — both in the security
+model, both live:
+
+- **Authorisation was self-grantable.** `is_allowed()` keyed on
+  `user_metadata.user_name`, which Supabase lets any user rewrite via
+  `auth.updateUser()`. With GitHub OAuth open to any account, one console
+  command bought full read/write plus user management.
+- **The database could be wiped by a stranger.** `reset_demo_core()` and its
+  two siblings were `security definer` and — via Supabase's default privileges —
+  granted `EXECUTE` to `anon`. That makes them callable as unauthenticated
+  PostgREST RPCs using the publishable key that ships in the JS bundle. The
+  earlier `revoke all ... from public` was a no-op, because `public` ≠ `anon`.
+  This one was found by an adversarial reviewer *attacking the fix* for the
+  first bug — the fix would have gated the front door and left the back door open.
+
+Fixed in `20260712192458_auth_identity_and_admin_tier`: authorisation now keys
+on `auth.uid()`; an admin tier gates user management and the demo reset
+(`service_role` passes it, so the MCP server still works); `audit_log.actor_user`
+is set server-side by trigger, so a forged `actor` no longer hides who was
+signed in. Verified by 20 adversarial probes against the live database —
+including signing in as a rogue account, rewriting its metadata to impersonate
+the admin, and confirming it reads zero rows.
+
+Also fixed: `daysUntil` computed "today" in UTC (the BST rule violated in the one
+function every compliance clock depends on); a deferred defect with no
+rectification deadline rendered *green*; a maintenance task that had **never been
+performed** rendered *green*; the MEL threshold table was duplicated in the
+Defects view; the manual defect insert was the only write in the app that skipped
+`logAudit()`; and the assistant destroyed its own conversation whenever it used
+its own `navigate` tool (the view unmounted mid-turn). A new guard test asserts
+the AI red lines can never be crossed by a future tool addition.
+
 ## Where everything stands
 
 - **Live**: private Cloudflare Pages deployment (`bun run deploy`; URL not
@@ -90,6 +125,15 @@ system.
 4. Dead mobile touch-target CSS via source-order defeat (Playwright/iPhone).
 5. `TRUNCATE CASCADE` wiping the sign-in allow-list via a new FK (Playwright).
 6. Damage-type distribution hole from shared modular factors (data check).
+7. Authorisation keyed on a user-writable JWT claim — self-grantable admin
+   access (security review, day 4).
+8. `security definer` reset helpers granted to `anon` — an *unauthenticated*
+   database wipe, and strictly worse than #7. Found by an adversarial agent
+   sent to break the fix for #7, not by the review that found #7 (day 4).
+9. A deferred defect with no rectification deadline, and a maintenance task
+   never once performed, both rendered **green** (day 4).
 
 Every one found by a verification layer, not by a user — which is the
-demonstration working as intended.
+demonstration working as intended. Note the shape of #8 in particular: the
+review found a hole, the fix closed it, and only *attacking the fix* revealed
+the bigger hole beside it. One adversarial pass is not enough.

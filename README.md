@@ -172,10 +172,11 @@ That replays the full history — schema, RLS, functions — and leaves the
 database seeded with the 100-aircraft demo (a final consolidation migration
 guarantees the definitive function bodies).
 
-**3. Create your first login** — accounts are normally made in Settings, but
-the very first one needs bootstrapping (the guard requires an existing
-allowed user). In the Supabase dashboard **SQL Editor**, run — changing the
-username and password:
+**3. Create your first login** — accounts are normally made in Settings, but the
+very first one needs bootstrapping (creating accounts requires an existing
+**admin**). In the Supabase dashboard **SQL Editor**, run — changing the username
+and password. Note `user_id`: access is granted to the authenticated *identity*,
+so an allow-list row that isn't bound to a real auth user grants nothing.
 
 ```sql
 do $$
@@ -193,13 +194,20 @@ begin
   values (gen_random_uuid(), uid, uid::text,
     jsonb_build_object('sub', uid::text, 'email', 'admin@aeromro.demo', 'email_verified', true),
     'email', now(), now(), now());
-  insert into allowed_users (username, auth_kind) values ('admin', 'password');
+  insert into allowed_users (username, auth_kind, user_id, is_admin)
+  values ('admin', 'password', uid, true);
+
+  -- Drop the demo allow-list entries seeded by the migrations. Leave them and
+  -- those GitHub/username holders could sign in to YOUR instance.
+  delete from allowed_users where username in ('DavidROliverBA', 'ux-test');
 end $$;
 ```
 
 (Prefer GitHub sign-in? Follow [`AUTH.md`](AUTH.md) and instead insert your
-GitHub login: `insert into allowed_users (username, auth_kind) values
-('<your-github-username>', 'github');`)
+GitHub login with no `user_id`: `insert into allowed_users (username, auth_kind,
+is_admin) values ('<your-github-username>', 'github', true);` — a trigger binds
+the row to your identity on first sign-in, which is how a GitHub user can be
+pre-authorised before they have an account.)
 
 **4. Configure and run** — copy `.env.example` to `.env.local`, fill in your
 project URL and publishable key (dashboard → Settings → API), then:
@@ -231,8 +239,16 @@ ANTHROPIC_API_KEY && bunx wrangler deploy`, then set `VITE_AI_PROXY_URL` in
 ## Security notes
 
 - **Allow-listed access**: RLS on every table requires membership in
-  `allowed_users` (checked against the JWT username), not just authentication.
-  The **audit log is append-only** — no update/delete policies exist.
+  `allowed_users`, matched on the **authenticated user id** (`auth.uid()`) — never
+  on JWT metadata, which is client-writable and would let any signed-in user
+  self-grant access. Admin acts (user management, demo reset) need
+  `allowed_users.is_admin`; there is no in-app path to self-promote.
+- The **audit log is append-only** — no update/delete policies exist. `actor`
+  carries the engineer attribution, but a trigger stamps `actor_user` with the
+  authenticated identity server-side, so a forged actor can't hide who was signed in.
+- **Any new `security definer` function must `revoke ... from public, anon`** —
+  Supabase's default privileges grant EXECUTE to `anon` explicitly, so revoking
+  from `public` alone leaves it callable, unauthenticated, over PostgREST.
 - **Invariants live in Postgres**: FH/FC roll-up trigger, WO-number sequence,
   unique card sequence, inspector ≠ signer constraint — enforced identically
   for the app, the MCP server, and any future client.

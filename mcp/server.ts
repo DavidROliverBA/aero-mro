@@ -79,7 +79,10 @@ async function rows<T>(table: string, build?: (q: any) => any): Promise<T[]> {
 }
 
 async function audit(entity: string, action: string, detail: string) {
-  await db.from("audit_log").insert({ entity, action, actor: "MCP (Claude Code)", detail });
+  // Throw, never swallow: a silently dropped audit row is a hole in an
+  // append-only evidence trail, which is worse than a failed write.
+  const { error } = await db.from("audit_log").insert({ entity, action, actor: "MCP (Claude Code)", detail });
+  if (error) throw new Error(`audit_log: ${error.message}`);
 }
 
 const text = (v: unknown) => ({
@@ -150,7 +153,11 @@ server.tool(
           severity: d.severity,
           status: d.status,
           mel: d.mel_reference ? `${d.mel_reference} Cat ${d.mel_cat}` : null,
-          clock: clock ? `${clock.daysRemaining}d remaining (${clock.tone})` : null,
+          clock: clock
+            ? clock.daysRemaining === null
+              ? `NO RECTIFICATION DEADLINE SET (${clock.tone})`
+              : `${clock.daysRemaining}d remaining (${clock.tone})`
+            : null,
         };
       }),
     );
