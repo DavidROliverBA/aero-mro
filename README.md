@@ -162,6 +162,88 @@ Click **Set Claude API key** in the sidebar and paste a key (`sk-ant-…`). Held
 in memory only — never persisted. The app is fully usable without it; only the
 ✨ features disable.
 
+## Stand up your own instance
+
+Everything you need is in this repo — you supply free-tier **Supabase** and
+**Cloudflare** accounts. ~15 minutes.
+
+**1. Clone and install**
+
+```bash
+git clone https://github.com/DavidROliverBA/aero-mro && cd aero-mro
+bun install
+```
+
+**2. Supabase (database + auth)** — create a project at
+[supabase.com](https://supabase.com) (free tier is fine), then:
+
+```bash
+brew install supabase/tap/supabase   # or see supabase.com/docs for your OS
+supabase login
+supabase link --project-ref <your-project-ref>
+supabase db push                     # applies every migration, in order
+```
+
+That replays the full history — schema, RLS, functions — and leaves the
+database seeded with the 100-aircraft demo (a final consolidation migration
+guarantees the definitive function bodies).
+
+**3. Create your first login** — accounts are normally made in Settings, but
+the very first one needs bootstrapping (the guard requires an existing
+allowed user). In the Supabase dashboard **SQL Editor**, run — changing the
+username and password:
+
+```sql
+do $$
+declare uid uuid := gen_random_uuid();
+begin
+  insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+    email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
+    updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
+  values ('00000000-0000-0000-0000-000000000000', uid, 'authenticated', 'authenticated',
+    'admin@aeromro.demo', extensions.crypt('CHANGE-THIS-PASSWORD', extensions.gen_salt('bf')),
+    now(), '{"provider":"email","providers":["email"]}',
+    '{"user_name":"admin"}', now(), now(), '', '', '', '');
+  insert into auth.identities (id, user_id, provider_id, identity_data, provider,
+    last_sign_in_at, created_at, updated_at)
+  values (gen_random_uuid(), uid, uid::text,
+    jsonb_build_object('sub', uid::text, 'email', 'admin@aeromro.demo', 'email_verified', true),
+    'email', now(), now(), now());
+  insert into allowed_users (username, auth_kind) values ('admin', 'password');
+end $$;
+```
+
+(Prefer GitHub sign-in? Follow [`AUTH.md`](AUTH.md) and instead insert your
+GitHub login: `insert into allowed_users (username, auth_kind) values
+('<your-github-username>', 'github');`)
+
+**4. Configure and run** — copy `.env.example` to `.env.local`, fill in your
+project URL and publishable key (dashboard → Settings → API), then:
+
+```bash
+bun run dev        # http://localhost:5173 — sign in as admin
+```
+
+Create further accounts in **Settings → User management**. If you use the
+Supabase MCP or the AeroMRO MCP server, update the `project_ref` in
+`.mcp.json` and add `SUPABASE_SERVICE_KEY` to `.env.local`.
+
+**5. Cloudflare (hosting)** — free account at
+[cloudflare.com](https://cloudflare.com), then:
+
+```bash
+bunx wrangler login
+bun run deploy     # creates the Pages project, prints your *.pages.dev URL
+```
+
+(Optionally change `--project-name` in `package.json` first. If using GitHub
+OAuth, add your new URL to the redirect lists per `AUTH.md`.)
+
+**6. AI features** — paste an Anthropic API key in Settings at runtime, or
+keep the key server-side: `cd workers/ai-proxy && bunx wrangler secret put
+ANTHROPIC_API_KEY && bunx wrangler deploy`, then set `VITE_AI_PROXY_URL` in
+`.env.local` and redeploy.
+
 ## Security notes
 
 - **Allow-listed access**: RLS on every table requires membership in
