@@ -88,7 +88,16 @@ export function EntityLink({
   title?: string;
 }) {
   return (
-    <button type="button" className="entity-link" onClick={onClick} title={title}>
+    <button
+      type="button"
+      className="entity-link"
+      title={title}
+      onClick={(e) => {
+        // Links often sit inside clickable rows — don't trigger both.
+        e.stopPropagation();
+        onClick();
+      }}
+    >
       {children}
     </button>
   );

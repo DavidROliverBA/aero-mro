@@ -212,3 +212,31 @@ export interface AllowedUser {
   auth_kind: "github" | "password";
   added_at: string;
 }
+
+export interface DamageRecord {
+  id: string;
+  aircraft_id: string;
+  pos_x: number;
+  pos_y: number;
+  damage_type: string;
+  station: string | null;
+  length_mm: number | null;
+  width_mm: number | null;
+  depth_mm: number | null;
+  within_limits: boolean;
+  srm_ref: string | null;
+  status: "open" | "monitor" | "repaired";
+  recorded_by: string;
+  recorded_at: string;
+  notes: string | null;
+}
+
+export interface AircraftPhoto {
+  id: string;
+  aircraft_id: string;
+  url: string;
+  caption: string | null;
+  credit: string | null;
+  added_by: string | null;
+  added_at: string;
+}
