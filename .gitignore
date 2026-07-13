@@ -5,6 +5,14 @@ dist
 *.log
 .DS_Store
 
+# Credentials. This repo is PUBLIC — nothing here may ever be committed.
+secret/
+secrets/
+*.key
+*.pem
+**/anthropic-key*
+**/*-key.txt
+
 # Playwright
 tests/.auth-state.json
 playwright-report/
