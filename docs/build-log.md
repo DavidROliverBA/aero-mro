@@ -102,6 +102,28 @@ Defects view; the manual defect insert was the only write in the app that skippe
 its own `navigate` tool (the view unmounted mid-turn). A new guard test asserts
 the AI red lines can never be crossed by a future tool addition.
 
+## Day 5 — 13 July (the copilot)
+
+- **The assistant became a dock** — a side panel (⌘J) that stays open over any
+  view, so it narrates while the app changes beneath it, instead of being a tab
+  you leave the app to visit. It keeps ONE position in the component tree across
+  hidden/inline/docked modes: moving it would remount it and destroy the
+  transcript, which is the bug day 4 had just fixed. A flex item's min-content
+  floor silently defeated the panel's padding and let the view slide underneath
+  it — caught by asserting the geometry in a Playwright test rather than trusting
+  a screenshot, and fixed with `min-width: 0`.
+- **Vision: damage assessment from a photo** — photograph a dent, get a proposed
+  damage record (type, station, dimensions, reasoning, confidence). The red line
+  is drawn where it matters: the model may *advise* on SRM limits, but the
+  within/beyond determination is the licence holder's and nothing auto-saves.
+- **Streaming + cancel** — replies render as they arrive and can be stopped.
+  Aborting discards the partial turn rather than committing it, because a
+  `tool_use` block left without its `tool_result` corrupts the next message.
+- **The AI proxy was an open relay** — it forwarded any POST to Anthropic with
+  the API key and no authentication (CORS governs what a *browser* may read; it
+  stops nothing else). It now verifies the caller's Supabase token. Still
+  undeployed pending an API key.
+
 ## Where everything stands
 
 - **Live**: private Cloudflare Pages deployment (`bun run deploy`; URL not

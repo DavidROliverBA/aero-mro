@@ -58,7 +58,26 @@ One tap on the Dashboard produces the duty manager's morning brief from the
 live snapshot — AOG and what unblocks it, clocks near breach, coverage gaps —
 most urgent first. Read-only narrative; nothing to confirm.
 
-### 5. The MCP server (`mcp/server.ts`)
+### 5. Damage assessment from a photo (`assessDamagePhoto`)
+
+The engineer photographs a dent at the aircraft (the file input opens the phone
+camera) and Claude reads the image, proposing a damage type, station, dimensions
+and a recommended action, with its reasoning and a stated confidence. The
+proposal pre-fills the damage-record form; the engineer corrects it and saves.
+
+This is the sharpest test of the thesis, because a plausible-sounding wrong
+answer here is an airworthiness problem — so the line is drawn deliberately:
+
+- The model returns `within_limits_suggestion`, never a determination. It is
+  rendered *beside* the SRM-limits control as advice, with its reasoning. The
+  engineer ticks the box; the AI cannot. Nothing auto-saves.
+- It must return `null` for dimensions it cannot measure rather than guess, and
+  `confidence: "low"` means "this photo is insufficient" — which the UI says
+  loudly rather than burying.
+- Position on the airframe stays a human act: a photo cannot tell you where the
+  damage is, so the engineer still clicks the schematic.
+
+### 6. The MCP server (`mcp/server.ts`)
 
 The same system exposed to any MCP client (e.g. Claude Code) as 12 typed
 tools importing the identical `src/lib/compliance.ts` functions — one source
@@ -77,6 +96,8 @@ to the in-app assistant, which auto-sends on arrival.
 | Raise defect / open WO / record sector | AI **proposes** → human confirms | Data entry from natural language, with accountability preserved |
 | Classify a defect (ATA, severity, MEL) | AI proposes → engineer accepts | Suggestion, not determination |
 | Draft CRS wording | AI drafts → engineer signs | Language is cognitive; the signature is legal |
+| Read a damage photo (type, station, size) | AI proposes → engineer corrects and saves | Perception assists; the record is the engineer's |
+| Within/beyond SRM limits | UI only — AI may advise, with reasoning | An airworthiness determination, not a description |
 | Task sign-off / independent inspection | UI only | 145.A.45(e)/145.A.48 — a named person certifies |
 | Issue CRS | UI only, twice-gated | 145.A.50 + Part-66 privilege |
 | Defer a defect under MEL | UI only | Airworthiness determination |

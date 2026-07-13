@@ -60,22 +60,30 @@ created in Settings → User management.
 
 ### The AI layer (Claude)
 
-1. **Agentic assistant** — ask anything, or ask it to *do* anything: raise
-   defects, open work orders, add task cards, record sectors, change aircraft
-   status. Every proposed write appears as a **pending action card** you
-   confirm or decline; confirmed actions are audit-logged as
-   `AI assistant (confirmed by <you>)`. It navigates the app for you and
-   flags compliance risks unprompted. Regulatory acts are deliberately not
-   available as tools — it takes you to the right view instead.
-2. **Defect triage** — paste a raw write-up; structured classification (ATA
+1. **Agentic assistant, docked beside the app** (**⌘J**) — ask anything, or ask
+   it to *do* anything: raise defects, open work orders, add task cards, record
+   sectors, change aircraft status. It's a side panel, not a tab, so it
+   **navigates the app while you watch** and keeps the conversation as the view
+   changes beneath it. Replies stream in and can be stopped mid-flight. Every
+   proposed write appears as a **pending action card** you confirm or decline;
+   confirmed actions are audit-logged as `AI assistant (confirmed by <you>)`.
+   Regulatory acts are deliberately not available as tools — it takes you to the
+   right view instead.
+2. **Damage assessment from a photo** — photograph a dent at the aircraft (the
+   file input opens the phone camera) and Claude proposes the damage type,
+   station, dimensions and recommended action, with its reasoning and confidence,
+   pre-filling the damage record for the engineer to correct and save. It may
+   *advise* on SRM limits; **the within/beyond-limits determination stays with the
+   licence holder**, and nothing auto-saves.
+3. **Defect triage** — paste a raw write-up; structured classification (ATA
    chapter, severity, AOG risk, suggested MEL category) via
    JSON-schema-constrained output.
-3. **CRS statement drafting** — a Part-145.A.50 release statement from the
+4. **CRS statement drafting** — a Part-145.A.50 release statement from the
    completed task cards, ready for the certifying engineer to review and sign.
-4. **Daily briefing** — one tap on the Dashboard writes the duty manager's
+5. **Daily briefing** — one tap on the Dashboard streams the duty manager's
    morning brief from live data, most urgent first.
 
-(The MCP server below is the fifth AI surface.) See
+(The MCP server below is the sixth AI surface.) See
 [`docs/ai-design.md`](docs/ai-design.md) for the UI-vs-AI decision framework
 and [`ROADMAP.md`](ROADMAP.md) for the research behind it.
 

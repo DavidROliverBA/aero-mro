@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
-import { hasApiKey, setApiKey } from "./lib/ai";
+import { hasApiKey, setApiKey, setAuthToken } from "./lib/ai";
 import Login from "./views/Login";
 import type {
   AdCompliance,
@@ -141,11 +141,15 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [dockOpen, setDockOpen] = useState(false);
   const [askSeed, setAskSeed] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   // Deep-link focus: which record the target view should select/highlight.
   const [focus, setFocus] = useState<string | null>(null);
   const pendingG = useRef(false);
+  // The global key handler is bound once; route it through a ref so it always
+  // calls the current toggleDock rather than a stale closure over `tab`.
+  const toggleDockRef = useRef<() => void>(() => {});
 
   // Global keyboard shortcuts: ⌘K or / = palette, ? = help, g+<letter> = go to view.
   useEffect(() => {
@@ -156,6 +160,11 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPaletteOpen((o) => !o);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        toggleDockRef.current();
         return;
       }
       if (typing) return;
@@ -170,6 +179,7 @@ export default function App() {
       }
       if (e.key === "Escape") {
         setHelpOpen(false);
+        setDockOpen(false);
         return;
       }
       if (pendingG.current) {
@@ -262,12 +272,18 @@ export default function App() {
   }
 
   // Track the auth session (Supabase handles the OAuth code exchange on load).
+  // The access token is handed to the AI layer so the proxy can authenticate the
+  // caller — it refuses unauthenticated requests rather than relay the API key.
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
+      setAuthToken(data.session?.access_token ?? null);
       setAuthReady(true);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      setAuthToken(s?.access_token ?? null);
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -375,7 +391,22 @@ export default function App() {
     setTab(t);
     setFocus(focusId ?? null);
     setMoreOpen(false);
+    // The assistant renders in exactly one place at a time. Opening its own tab
+    // closes the dock, so it can never appear twice.
+    if (t === "assistant") setDockOpen(false);
   }
+
+  // Docking it while its own tab is showing would leave the main area empty.
+  function toggleDock() {
+    setDockOpen((open) => {
+      if (!open && tab === "assistant") {
+        setTab("dashboard");
+        setFocus(null);
+      }
+      return !open;
+    });
+  }
+  toggleDockRef.current = toggleDock;
 
   if (!authReady) {
     return (
@@ -442,7 +473,7 @@ export default function App() {
   );
 
   return (
-    <div className="app">
+    <div className={`app${dockOpen ? " dock-open" : ""}`}>
       <a href="#main" className="skip-link">Skip to content</a>
 
       {/* Desktop sidebar */}
@@ -457,6 +488,14 @@ export default function App() {
           onClick={() => setPaletteOpen(true)}
         >
           🔎 Search everything <span className="muted" style={{ float: "right" }}>⌘K</span>
+        </button>
+        <button
+          className="btn ghost"
+          style={{ width: "100%", marginBottom: 12, textAlign: "left" }}
+          onClick={toggleDock}
+          aria-pressed={dockOpen}
+        >
+          ✨ {dockOpen ? "Hide" : "Ask"} AI <span className="muted" style={{ float: "right" }}>⌘J</span>
         </button>
         <nav className="nav" aria-label="Main navigation">
           {NAV_GROUPS.map((g) => (
@@ -520,12 +559,13 @@ export default function App() {
           </div>
         )}
         {loading ? <p className="spinner" role="status">Loading fleet data…</p> : view}
-        {/* Rendered on every tab, outside the conditional chain above: the assistant's
-            own navigate tool switches tabs mid-turn, and unmounting it there would
-            destroy the transcript, the tool_use/tool_result history and any pending
-            action cards. When inactive it renders nothing at all (no hidden DOM). */}
+        {/* Rendered on every tab, in ONE fixed position in the tree: the assistant's
+            own navigate tool switches tabs mid-turn, and unmounting (or moving) it
+            would destroy the transcript, the tool_use/tool_result history and any
+            pending action cards. `mode` switches it between the full-page tab, the
+            side dock, and nothing at all — never a different parent. */}
         <Assistant
-          active={tab === "assistant"}
+          mode={dockOpen ? "dock" : tab === "assistant" ? "inline" : "hidden"}
           storeRef={storeRef}
           reload={reload}
           keySet={keySet}
@@ -534,6 +574,7 @@ export default function App() {
           account={account}
           seed={askSeed}
           onSeedConsumed={() => setAskSeed(null)}
+          onClose={() => setDockOpen(false)}
         />
       </main>
 
@@ -581,6 +622,7 @@ export default function App() {
             <h3>Keyboard shortcuts</h3>
             <div className="kbd-grid">
               <div><kbd>⌘K</kbd> or <kbd>/</kbd></div><div>Search everything</div>
+              <div><kbd>⌘J</kbd></div><div>Toggle the AI assistant panel</div>
               <div><kbd>?</kbd></div><div>This help</div>
               <div><kbd>g</kbd> then <kbd>d</kbd></div><div>Dashboard</div>
               <div><kbd>g</kbd> then <kbd>m</kbd></div><div>My Work</div>

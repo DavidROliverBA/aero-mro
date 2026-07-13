@@ -41,8 +41,11 @@ export default function Dashboard({
   async function runBrief() {
     if (!keySet) return onNeedKey();
     setBriefing(true);
+    setBrief("");
     try {
-      setBrief(await dailyBrief(buildSnapshot(store)));
+      // Streamed: a blocking call left the button on "Briefing…" for 20s with no
+      // sign of life. Deltas land in the panel as the model writes them.
+      await dailyBrief(buildSnapshot(store), { onText: (d) => setBrief((b) => (b ?? "") + d) });
     } catch (e) {
       setBrief(`Error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {

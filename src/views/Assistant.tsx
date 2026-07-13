@@ -32,8 +32,14 @@ const SUGGESTIONS = [
 // them) before we stop and hand control back to the user.
 const MAX_AUTO_TURNS = 5;
 
+// "dock" = the side panel that stays open over any view, so the assistant can
+// narrate while the main view changes under it. The component must keep ONE
+// position in the tree across all three modes: moving it would remount it and
+// destroy the transcript and the in-flight tool protocol.
+export type AssistantMode = "hidden" | "inline" | "dock";
+
 export default function Assistant({
-  active,
+  mode,
   storeRef,
   reload,
   keySet,
@@ -42,8 +48,9 @@ export default function Assistant({
   account,
   seed,
   onSeedConsumed,
+  onClose,
 }: {
-  active: boolean;
+  mode: AssistantMode;
   storeRef: { current: Store };
   reload: () => Promise<void>;
   keySet: boolean;
@@ -52,10 +59,14 @@ export default function Assistant({
   account: string;
   seed?: string | null;
   onSeedConsumed?: () => void;
+  onClose?: () => void;
 }) {
   const [items, setItems] = useState<ChatItem[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  // Text of the turn currently streaming in, rendered as a live bubble.
+  const [streamText, setStreamText] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
   // API-visible history lives in a ref: it must stay in lockstep with the
   // tool_use / tool_result protocol even while UI state updates async.
   const history = useRef<AgentMessage[]>([]);
@@ -85,10 +96,23 @@ export default function Assistant({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seed]);
 
+  function cancel() {
+    abortRef.current?.abort();
+  }
+
   async function runTurn(depth = 0) {
     setBusy(true);
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setStreamText("");
     try {
-      const turn = await agentTurn(history.current, buildSnapshot(storeRef.current));
+      const turn = await agentTurn(history.current, buildSnapshot(storeRef.current), {
+        onText: (d) => setStreamText((t) => t + d),
+        signal: ac.signal,
+      });
+      // Committed only on success: an aborted turn must leave no assistant blocks
+      // in the history, or the tool_use it was emitting would never get its
+      // tool_result and the next message would be rejected.
       history.current.push({ role: "assistant", content: turn.assistantBlocks });
       if (turn.text) push({ kind: "assistant", text: turn.text });
       if (turn.stopReason === "max_tokens")
@@ -138,8 +162,12 @@ export default function Assistant({
         expectedPending.current = pendingCount;
       }
     } catch (e) {
-      push({ kind: "system", text: `Error: ${e instanceof Error ? e.message : String(e)}` });
+      if ((e as { name?: string })?.name === "AbortError")
+        push({ kind: "system", text: "Cancelled." });
+      else push({ kind: "system", text: `Error: ${e instanceof Error ? e.message : String(e)}` });
     } finally {
+      abortRef.current = null;
+      setStreamText("");
       setBusy(false);
     }
   }
@@ -206,17 +234,30 @@ export default function Assistant({
   }
 
   // Mounted on every tab (App keeps the session alive across navigation) but
-  // renders nothing when another view is showing — no hidden DOM, so nothing
-  // here is focusable, announced, or matched by a query on the visible view.
-  if (!active) return null;
+  // renders nothing when hidden — no hidden DOM, so nothing here is focusable,
+  // announced, or matched by a query on the visible view.
+  if (mode === "hidden") return null;
 
-  return (
+  const dock = mode === "dock";
+
+  const body = (
     <>
-      <h1>AI Assistant</h1>
-      <p className="subtitle">
-        Ask anything, or ask it to do anything — every change it proposes needs your confirmation.
-        Sign-offs, CRS, deferrals and quarantine stay in their own views: those are licence-holder acts.
-      </p>
+      {dock ? (
+        <div className="dock-head">
+          <strong>AI Assistant</strong>
+          <button className="btn ghost" onClick={onClose} aria-label="Close assistant panel">
+            ✕
+          </button>
+        </div>
+      ) : (
+        <>
+          <h1>AI Assistant</h1>
+          <p className="subtitle">
+            Ask anything, or ask it to do anything — every change it proposes needs your confirmation.
+            Sign-offs, CRS, deferrals and quarantine stay in their own views: those are licence-holder acts.
+          </p>
+        </>
+      )}
 
       {items.length === 0 && (
         <div className="row" style={{ marginBottom: 16 }}>
@@ -261,7 +302,8 @@ export default function Assistant({
             </div>
           );
         })}
-        {busy && <div className="msg system" role="status">Thinking…</div>}
+        {busy && streamText && <div className="msg assistant">{streamText}</div>}
+        {busy && !streamText && <div className="msg system" role="status">Thinking…</div>}
       </div>
 
       <div className="chat-input">
@@ -273,10 +315,24 @@ export default function Assistant({
           aria-label="Message the assistant"
           disabled={busy || hasPending}
         />
-        <button className="btn" onClick={() => void send()} disabled={busy || hasPending || !input.trim()}>
-          Send
-        </button>
+        {busy ? (
+          <button className="btn ghost" onClick={cancel}>
+            Stop
+          </button>
+        ) : (
+          <button className="btn" onClick={() => void send()} disabled={hasPending || !input.trim()}>
+            Send
+          </button>
+        )}
       </div>
     </>
+  );
+
+  if (!dock) return body;
+
+  return (
+    <aside className="assistant-dock" aria-label="AI assistant panel">
+      {body}
+    </aside>
   );
 }

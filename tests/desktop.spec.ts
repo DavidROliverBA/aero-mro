@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 
 const CMD_K = process.platform === "darwin" ? "Meta+KeyK" : "Control+KeyK";
+const CMD_J = process.platform === "darwin" ? "Meta+KeyJ" : "Control+KeyJ";
 const SHOTS = "/private/tmp/claude-501/-Users-davidoliver-github-aero-mro/8749e9a4-7665-437f-9c34-b3dd4fc5a24b/scratchpad/shots";
 
 // Boot the SPA and wait past the "Loading fleet data…" spinner.
@@ -141,4 +142,55 @@ test("7. theme: Settings toggles html data-theme light and back to dark", async 
 
   await page.getByRole("radio", { name: /Dark/ }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+});
+
+test("8. AI dock: ⌘J opens a panel that survives navigation, Escape closes it", async ({ page }) => {
+  await boot(page);
+  const dock = page.locator("aside.assistant-dock");
+  await expect(dock).toBeHidden();
+
+  await page.keyboard.press(CMD_J);
+  await expect(dock).toBeVisible();
+  // The point of a dock: the main view is still there beside it.
+  await expect(page.getByRole("heading", { level: 1, name: "Fleet Airworthiness Dashboard" })).toBeVisible();
+
+  // The panel is a copilot over the app — it must persist across navigation, and
+  // the transcript with it (that was the bug: navigating unmounted the assistant).
+  await dock.getByLabel("Message the assistant").fill("scratch text survives");
+  await nav(page, /Defects/);
+  await expect(page.getByRole("heading", { level: 1, name: /Defects/ })).toBeVisible();
+  await expect(dock).toBeVisible();
+  await expect(dock.getByLabel("Message the assistant")).toHaveValue("scratch text survives");
+  await page.screenshot({ path: `${SHOTS}/08-dock.png` });
+
+  // The dock must make ROOM, not cover the view. A flex item's min-content floor
+  // silently defeated the padding once already — assert the geometry, don't eyeball
+  // it. Excluded: the dock's own subtree, and anything inside a .table-wrap, which
+  // is an overflow-x scroller and is meant to clip its table.
+  const overlap = await page.evaluate(() => {
+    const dockLeft = document.querySelector("aside.assistant-dock")!.getBoundingClientRect().left;
+    const hidden = [...document.querySelectorAll("main.main *")].filter((el) => {
+      if (el.closest(".assistant-dock") || el.closest(".table-wrap")) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.right > dockLeft + 1;
+    });
+    return { count: hidden.length, scrollW: document.documentElement.scrollWidth, vw: window.innerWidth };
+  });
+  expect(overlap.count).toBe(0);
+  expect(overlap.scrollW).toBeLessThanOrEqual(overlap.vw);
+
+  await page.keyboard.press("Escape");
+  await expect(dock).toBeHidden();
+});
+
+test("9. AI dock and the assistant tab never render two assistants", async ({ page }) => {
+  await boot(page);
+  await page.keyboard.press(CMD_J);
+  await expect(page.locator("aside.assistant-dock")).toBeVisible();
+
+  // Opening the assistant's own tab closes the dock rather than duplicating it.
+  await nav(page, /Assistant/);
+  await expect(page.getByRole("heading", { level: 1, name: "AI Assistant" })).toBeVisible();
+  await expect(page.locator("aside.assistant-dock")).toBeHidden();
+  await expect(page.getByLabel("Message the assistant")).toHaveCount(1);
 });

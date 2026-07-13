@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Store, Tab } from "../App";
 import { supabase } from "../lib/supabase";
 import { logAudit } from "../lib/audit";
+import { assessDamagePhoto, hasApiKey, type DamageAssessment } from "../lib/ai";
 import { statusPill, Pill, EntityLink, EmptyState } from "../components/ui";
 import DamageSchematic, { damageTone } from "../components/DamageSchematic";
 import { mpDue, type DueItem, type Tone } from "../lib/compliance";
@@ -37,6 +38,11 @@ export default function Fleet({
   const [dSrm, setDSrm] = useState("");
   const [dBy, setDBy] = useState("");
   const [dNotes, setDNotes] = useState("");
+  // AI photo-assessment state (proposal only — see applyAiProposal below)
+  const [aiPhoto, setAiPhoto] = useState<{ mediaType: string; base64: string; previewUrl: string } | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiResult, setAiResult] = useState<DamageAssessment | null>(null);
   // Photo add-flow state
   const [pUrl, setPUrl] = useState("");
   const [pCaption, setPCaption] = useState("");
@@ -53,6 +59,14 @@ export default function Fleet({
     setAddMode(false);
     setPendingPos(null);
     setMsg(null);
+    resetAiAssessment();
+  }
+
+  function resetAiAssessment() {
+    setAiPhoto(null);
+    setAiBusy(false);
+    setAiError(null);
+    setAiResult(null);
   }
 
   function resetDamageForm() {
@@ -65,6 +79,61 @@ export default function Fleet({
     setDSrm("");
     setDBy("");
     setDNotes("");
+    resetAiAssessment();
+  }
+
+  function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setAiError(null);
+    setAiResult(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === "string" ? reader.result : "";
+      const match = dataUrl.match(/^data:([^;]+);base64,(.*)$/);
+      if (!match) {
+        setAiError("Could not read that image file.");
+        return;
+      }
+      setAiPhoto({ mediaType: match[1], base64: match[2], previewUrl: dataUrl });
+    };
+    reader.onerror = () => setAiError("Could not read that image file.");
+    reader.readAsDataURL(file);
+  }
+
+  async function runPhotoAssessment() {
+    if (!ac || !aiPhoto) return;
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      setAiResult(
+        await assessDamagePhoto(aiPhoto.base64, aiPhoto.mediaType, {
+          registration: ac.registration,
+          type: ac.type_designator,
+        }),
+      );
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  // RED LINE: within_limits is a licence-holder airworthiness determination
+  // (Part-145 / EASA NPA 2025-07), not something a photo assessment can make.
+  // This deliberately copies type/station/dimensions but never touches
+  // dWithin — the checkbox stays wherever the engineer left it, and the AI's
+  // within_limits_suggestion is only ever displayed beside it as advice.
+  function applyAiProposal() {
+    if (!aiResult) return;
+    setDType(aiResult.damage_type);
+    if (aiResult.station) setDStation(aiResult.station);
+    setDDims({
+      l: aiResult.length_mm != null ? String(aiResult.length_mm) : "",
+      w: aiResult.width_mm != null ? String(aiResult.width_mm) : "",
+      d: aiResult.depth_mm != null ? String(aiResult.depth_mm) : "",
+    });
   }
 
   async function saveDamage() {
@@ -244,6 +313,89 @@ export default function Fleet({
           {addMode && pendingPos && (
             <fieldset style={{ marginTop: 6 }}>
               <legend>New damage at ({pendingPos.x}, {pendingPos.y})</legend>
+
+              <div className="ai-box" style={{ marginBottom: 14 }}>
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <strong>Assess damage from photo</strong>
+                  <span className="ai-tag">✨ AI photo assessment</span>
+                </div>
+                {!hasApiKey() ? (
+                  <p className="muted" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+                    Add a Claude API key in Settings to assess damage photos with AI.
+                  </p>
+                ) : (
+                  <>
+                    <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handlePhotoSelect}
+                        aria-label="Photograph or choose a photo of the damage"
+                      />
+                      {aiPhoto && (
+                        <button
+                          type="button"
+                          className="btn ghost small"
+                          disabled={aiBusy}
+                          onClick={() => void runPhotoAssessment()}
+                        >
+                          {aiBusy ? "Assessing…" : "✨ Assess with AI"}
+                        </button>
+                      )}
+                    </div>
+                    {aiPhoto && (
+                      <img
+                        src={aiPhoto.previewUrl}
+                        alt="Selected damage photo preview"
+                        style={{ height: 90, borderRadius: 8, border: "1px solid var(--border)", display: "block", marginTop: 8 }}
+                      />
+                    )}
+                    {aiError && (
+                      <div className="banner danger" role="alert" style={{ marginTop: 8 }}>
+                        {aiError}
+                      </div>
+                    )}
+                    {aiResult && (
+                      <div className="ai-out">
+                        <div className="row" style={{ gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                          <Pill tone="info">{aiResult.damage_type}</Pill>
+                          {aiResult.station && <Pill tone="muted">{aiResult.station}</Pill>}
+                          <Pill tone={aiResult.confidence === "low" ? "danger" : aiResult.confidence === "medium" ? "warn" : "ok"}>
+                            {aiResult.confidence} confidence
+                          </Pill>
+                        </div>
+                        {aiResult.confidence === "low" && (
+                          <div className="banner danger" role="alert">
+                            Low confidence — this photo may not be good enough to assess reliably. Consider a
+                            clearer photo (better angle, lighting, or a scale reference) or a physical inspection.
+                          </div>
+                        )}
+                        <div style={{ marginBottom: 6 }}>
+                          <strong>Proposed dimensions (L×W×D mm):</strong>{" "}
+                          {aiResult.length_mm ?? "—"}×{aiResult.width_mm ?? "—"}×{aiResult.depth_mm ?? "—"}
+                        </div>
+                        <div style={{ marginBottom: 6 }}>{aiResult.reasoning}</div>
+                        <div style={{ marginBottom: 6 }}>
+                          <strong>Recommended action:</strong> {aiResult.recommended_action}
+                        </div>
+                        <div className="row" style={{ marginTop: 4 }}>
+                          <button type="button" className="btn ghost small" onClick={applyAiProposal}>
+                            Use these values in the form below
+                          </button>
+                        </div>
+                        <div className="muted" style={{ marginTop: 8, fontSize: 11 }}>
+                          ✨ AI-generated proposal from a photograph, not a determination — check every value
+                          before saving. Position on the schematic stays as you placed it; whether the damage is
+                          within SRM limits is for you to decide below (see the AI's suggestion beside that
+                          control).
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
               <div className="row" style={{ alignItems: "flex-end" }}>
                 <div style={{ minWidth: 140 }}>
                   <label htmlFor="dm-type">Type</label>
@@ -281,6 +433,18 @@ export default function Fleet({
                   <input type="checkbox" checked={dWithin} onChange={(e) => setDWithin(e.target.checked)} style={{ width: "auto", minHeight: "auto" }} />
                   Within SRM limits
                 </label>
+                {aiResult && (
+                  // Advisory only — see the RED LINE comment on applyAiProposal. The
+                  // checkbox above is never set from this; the engineer sets it.
+                  <span className="muted" style={{ fontSize: 11, maxWidth: 260 }} title={aiResult.reasoning}>
+                    ✨ AI suggestion (advisory, not applied):{" "}
+                    {aiResult.within_limits_suggestion === null
+                      ? "cannot say from this photo"
+                      : aiResult.within_limits_suggestion
+                        ? "appears within limits"
+                        : "appears beyond limits"}
+                  </span>
+                )}
                 <button className="btn" disabled={busy !== null} onClick={() => void saveDamage()}>
                   {busy === "damage" ? "Saving…" : "Record damage"}
                 </button>
