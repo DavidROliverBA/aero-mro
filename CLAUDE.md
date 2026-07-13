@@ -65,8 +65,10 @@ loaded whole (fine at demo scale, `aircraftById`/`engineersById` maps for
 lookups); Supabase Postgres with allow-listed RLS (`allowed_users.username`
 vs JWT `user_name`); auth = GitHub OAuth or username/password (usernames map
 to `<u>@aeromro.demo`; accounts managed in Settings via SECURITY DEFINER
-functions); AI = browser Claude calls (`claude-opus-4-8`, runtime key, or
-deploy `workers/ai-proxy`); `mcp/server.ts` = 12-tool stdio MCP server
+functions); AI = Claude (`claude-opus-4-8`) via the same-origin Pages Function
+`functions/api/ai.ts` (holds the key as a Cloudflare secret, verifies the
+caller's Supabase token; `.env.production` points at it) — local dev falls back
+to a runtime key pasted in Settings; `mcp/server.ts` = 12-tool stdio MCP server
 (needs `SUPABASE_SERVICE_KEY` in `.env.local`, present on David's machine).
 
 ## Demo operations

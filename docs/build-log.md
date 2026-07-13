@@ -121,8 +121,12 @@ the AI red lines can never be crossed by a future tool addition.
   `tool_use` block left without its `tool_result` corrupts the next message.
 - **The AI proxy was an open relay** — it forwarded any POST to Anthropic with
   the API key and no authentication (CORS governs what a *browser* may read; it
-  stops nothing else). It now verifies the caller's Supabase token. Still
-  undeployed pending an API key.
+  stops nothing else). It now verifies the caller's Supabase token, and it is
+  **deployed**: as a same-origin Pages Function (`functions/api/ai.ts`) rather
+  than a standalone Worker, because the account has no `workers.dev` subdomain —
+  which turned out better, since same-origin removes CORS from the picture
+  entirely. The key now lives in Cloudflare, and a demo no longer opens with
+  someone pasting an API key into Settings.
 
 ## Where everything stands
 

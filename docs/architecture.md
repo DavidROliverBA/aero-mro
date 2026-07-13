@@ -70,8 +70,10 @@ preserving user-added engineers and the sign-in registry.
 
 ## Known demo shortcuts
 
-- The Claude key lives in browser memory unless `workers/ai-proxy` is deployed
-  and `VITE_AI_PROXY_URL` set (the Worker exists in-repo, undeployed).
+- (Closed) The Claude key used to live in browser memory. The deployed build now
+  routes every call through a same-origin Pages Function (`functions/api/ai.ts`),
+  which verifies the caller's Supabase token and holds the key server-side. Local
+  dev has no such function and still uses a runtime key.
 - No offline mode (top of Tier 2 in the roadmap — hangar dead zones are a
   documented pain point).
 - Single organisation; one access level (allow-listed), no per-role RLS yet.

@@ -141,9 +141,11 @@ throughout.
   allow-listed RLS, invariants in triggers/constraints) + Auth (GitHub OAuth
   and username/password; engineer-linked logins bind sign-offs to identity —
   see [`AUTH.md`](AUTH.md))
-- **AI:** Claude (`claude-opus-4-8`) — runtime key in Settings (memory-only,
-  never persisted; everything except the ✨ features works without one) or
-  server-side via `workers/ai-proxy`
+- **AI:** Claude (`claude-opus-4-8`) — server-side via a same-origin Pages
+  Function (`functions/api/ai.ts`) that verifies the caller's Supabase token, so
+  the key never reaches the browser. Without it (e.g. local dev), paste a key in
+  Settings: memory-only, never persisted, and everything except the ✨ features
+  works without one
 - **Testing:** bun test + Playwright + GitHub Actions CI
 
 ## Quick start (existing instance)
@@ -260,8 +262,17 @@ ANTHROPIC_API_KEY && bunx wrangler deploy`, then set `VITE_AI_PROXY_URL` in
 - **Invariants live in Postgres**: FH/FC roll-up trigger, WO-number sequence,
   unique card sequence, inspector ≠ signer constraint — enforced identically
   for the app, the MCP server, and any future client.
-- The Claude key is entered at runtime and held in memory; for zero
-  browser exposure, deploy `workers/ai-proxy` and set `VITE_AI_PROXY_URL`.
+- **The Claude key never reaches the browser** in a deployed build: calls go
+  through `functions/api/ai.ts`, a same-origin Pages Function holding the key as a
+  Cloudflare secret. It **authenticates every request** against the caller's
+  Supabase token — an unauthenticated proxy is an open relay for the API key, and
+  CORS would not prevent that (it governs what a *browser* may read, not what
+  `curl` may send). Set it up with `wrangler pages secret put ANTHROPIC_API_KEY`
+  (plus `SUPABASE_URL` and `SUPABASE_ANON_KEY`); `.env.production` points the app
+  at it. `workers/ai-proxy/` is the same thing as a standalone Worker if you would
+  rather host it separately.
+- Anyone who can sign in to a deployment can spend its Anthropic quota — that is
+  inherent to a hosted key. Keep the sign-in list tight.
 - The publishable Supabase key is client-safe by design.
 
 ## Project layout
