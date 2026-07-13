@@ -4,10 +4,18 @@ compatibility_date = "2026-07-01"
 
 # Deploy:
 #   cd workers/ai-proxy
-#   bunx wrangler secret put ANTHROPIC_API_KEY
+#   bunx wrangler secret put ANTHROPIC_API_KEY   # your Claude key
+#   bunx wrangler secret put ALLOWED_ORIGIN      # https://<your-deployment>.pages.dev
+#   bunx wrangler secret put SUPABASE_URL        # https://<ref>.supabase.co
+#   bunx wrangler secret put SUPABASE_ANON_KEY   # the publishable key
 #   bunx wrangler deploy
 # Then set VITE_AI_PROXY_URL=https://aero-mro-ai-proxy.<account>.workers.dev
-# in .env.local (and the Pages build env) — the browser never sees the key.
-
-[vars]
-ALLOWED_ORIGIN = "https://<your-deployment>.pages.dev"
+# in .env.local (and the Pages build env) — the browser never sees the Claude key.
+#
+# All four are set as SECRETS rather than [vars] on purpose: ALLOWED_ORIGIN is the
+# deployment URL, which is deliberately absent from this repo. Secrets are exposed
+# on `env` exactly like vars, so the code is unchanged either way.
+#
+# The worker REFUSES unauthenticated requests (it verifies the caller's Supabase
+# token). Without that it would be an open relay for the API key: CORS only governs
+# what a browser may read, and stops curl at nothing.
